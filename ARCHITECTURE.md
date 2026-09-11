@@ -20,13 +20,14 @@ src/
   shared/
     ui/card/              Generic value card
     ui/brand-icon/        Shared brand asset component
+    ui/select/            Custom listbox select for header controls
     lib/format/           Byte and elapsed-time formatting
   main.tsx                Renderer bootstrap
 ```
 
 `@/` resolves to `src/` in Vite and TypeScript. Modules inside a slice use relative imports; other slices consume its public API. `npm run check:architecture` checks static import/export boundaries and is part of `npm run build`.
 
-Global layout styles are in `app/styles/base.css`; interaction states and the automatic `prefers-color-scheme: light` theme are in `app/styles/theme.css`. Electron follows `nativeTheme.themeSource = system` and updates window backgrounds when macOS appearance changes.
+Global layout styles are in `app/styles/base.css`; interaction states and the light theme overrides are in `app/styles/theme.css`. The resolved theme (`light`/`dark`) is set on `html[data-theme]` from a persisted preference (`system`/`light`/`dark`); Electron keeps `nativeTheme.themeSource = system`, resolves the system preference against macOS appearance, and updates window backgrounds to match.
 
 `electron/` is a separate privileged runtime, outside renderer FSD. It owns configuration files, permissions, command execution, tray windows and IPC validation. Renderer code uses the preload API via `entities/tunnel`; it has no Node.js access. Existing IPC channel names and on-disk profiles remain compatible.
 

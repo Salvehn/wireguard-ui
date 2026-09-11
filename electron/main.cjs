@@ -8,7 +8,9 @@ const {RuntimeStatus}=require('./runtime-status.cjs');
 const helperClient=require('./helper-client.cjs');
 const {assertUniqueProfile}=require('./profile-identity.cjs');
 const {createLocale}=require('./locale.cjs');
+const {createTheme}=require('./theme.cjs');
 let locale;const t=(source,values)=>locale?.t(source,values)||source;
+let theme;
 let refreshLocaleUI=()=>{};
 let importing=false;
 let runtime;let helper={status:'required',message:''};let helperSnapshot={profiles:{},updatedAt:0};let snapshotPending=null;let helperSetup=null;
@@ -32,8 +34,8 @@ async function profiles(){ const files=await fs.readdir(dir);await updateSnapsho
 async function state(){const all=await profiles();return {profiles:all.map(p=>({...p,notes:routeNotes(p,all)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
 app.whenReady().then(async()=>{
  nativeTheme.themeSource='system';
- const applyAppearance=()=>{const color=nativeTheme.shouldUseDarkColors?'#101416':'#f5f8f6';for(const window of BrowserWindow.getAllWindows())window.setBackgroundColor(color)};
- nativeTheme.on('updated',applyAppearance);
+ theme=createTheme(path.join(app.getPath('userData'),'theme.json'),()=>nativeTheme.shouldUseDarkColors);await theme.load();
+ const applyAppearance=()=>{const color=theme.get().theme==='dark'?'#101416':'#f5f8f6';for(const window of BrowserWindow.getAllWindows())window.setBackgroundColor(color)};
  dir=path.join(app.getPath('userData'),'tunnels');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.chmod(dir,0o700);
  locale=createLocale(path.join(app.getPath('userData'),'locale.json'),()=>app.getPreferredSystemLanguages());await locale.load();
  runtime=new RuntimeStatus('/var/run/wireguard',path.join(app.getPath('userData'),'runtime-status.json'));await runtime.load();
@@ -49,6 +51,11 @@ app.whenReady().then(async()=>{
  const publishLocale=()=>{const current=locale.get();const signature=JSON.stringify(current);if(signature!==lastLocale){lastLocale=signature;for(const window of BrowserWindow.getAllWindows())window.webContents.send('locale-changed',current);refreshLocaleUI()}return current};
  ipcMain.handle('get-locale',e=>{authorized(e);return publishLocale()});
  ipcMain.handle('set-locale',async(e,preference)=>{authorized(e);await locale.set(preference);return publishLocale()});
+ let lastTheme=JSON.stringify(theme.get());
+ const publishTheme=()=>{const current=theme.get();const signature=JSON.stringify(current);if(signature!==lastTheme){lastTheme=signature;for(const window of BrowserWindow.getAllWindows())window.webContents.send('theme-changed',current);applyAppearance()}return current};
+ nativeTheme.on('updated',publishTheme);
+ ipcMain.handle('get-theme',e=>{authorized(e);return publishTheme()});
+ ipcMain.handle('set-theme',async(e,preference)=>{authorized(e);await theme.set(preference);return publishTheme()});
  ipcMain.handle('state',async e=>{authorized(e);return state()});
  ipcMain.handle('setup-helper',async e=>{authorized(e);await setupHelper();return state()});
  ipcMain.handle('refresh-stats',async e=>{

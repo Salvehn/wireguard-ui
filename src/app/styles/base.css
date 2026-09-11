@@ -855,15 +855,13 @@ nav::-webkit-scrollbar-corner,
   outline: 2px solid #749980;
   outline-offset: 3px;
 }
-@media (prefers-color-scheme: light) {
-  .connections-popover {
-    background: #fff;
-    color: #263c2d;
-    border-color: #d6e2d9;
-  }
-  .connections-popover > p {
-    color: #607468;
-  }
+html[data-theme="light"] .connections-popover {
+  background: #fff;
+  color: #263c2d;
+  border-color: #d6e2d9;
+}
+html[data-theme="light"] .connections-popover > p {
+  color: #607468;
 }
 
 .connection-row {
@@ -881,19 +879,21 @@ nav::-webkit-scrollbar-corner,
   align-items: center;
   gap: 10px;
 }
+.theme-control,
 .language-control {
   position: relative;
   -webkit-app-region: no-drag;
 }
-.language-picker {
+.select {
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+.select-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: inherit;
-}
-.language-picker select {
-  width: 95px;
-  padding: 6px 2px;
+  min-width: 108px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -902,14 +902,54 @@ nav::-webkit-scrollbar-corner,
   letter-spacing: 0;
   cursor: pointer;
 }
-.language-picker select:focus-visible {
+.select-toggle:focus-visible {
   outline: 2px solid #749980;
   outline-offset: 2px;
 }
-.language-picker option {
+.select-chevron {
+  margin-left: auto;
+  transition: transform 160ms ease;
+}
+.select-chevron.open {
+  transform: rotate(180deg);
+}
+.select-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 100%;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: 8px;
   background: #19211c;
   color: #c3d1c8;
+  box-shadow: 0 12px 40px #00000066;
+  animation: fade-in 120ms ease-out;
 }
+.select-list:focus {
+  outline: none;
+}
+.select-list:focus-visible {
+  outline: 2px solid #749980;
+  outline-offset: 2px;
+}
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.select-option.active {
+  background: #ffffff1a;
+}
+.select-option[aria-selected="true"] {
+  color: #9ccfaa;
+}
+.theme-error,
 .language-error {
   position: absolute;
   top: 100%;
@@ -922,13 +962,18 @@ nav::-webkit-scrollbar-corner,
   font-size: 11px;
   letter-spacing: 0;
 }
-@media (prefers-color-scheme: light) {
-  .language-picker option {
-    background: #fff;
-    color: #263c2d;
-  }
-  .language-error {
-    background: #fff1eb;
-    color: #8a3425;
-  }
+html[data-theme="light"] .select-list {
+  background: #fff;
+  color: #263c2d;
+}
+html[data-theme="light"] .select-option.active {
+  background: #eef3ee;
+}
+html[data-theme="light"] .select-option[aria-selected="true"] {
+  color: #285b3a;
+}
+html[data-theme="light"] .theme-error,
+html[data-theme="light"] .language-error {
+  background: #fff1eb;
+  color: #8a3425;
 }

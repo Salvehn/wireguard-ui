@@ -19,6 +19,7 @@ import { TunnelNavigation } from "@/widgets/tunnel-navigation";
 import { StatsPanel } from "@/widgets/tunnel-stats";
 import { EventLog } from "@/widgets/event-log";
 import { Card } from "@/shared/ui/card";
+import { ThemeSwitcher } from "@/features/change-theme";
 import { LanguageSwitcher } from "@/features/change-language";
 export function WorkspacePage() {
   const { data, setData, ready, error, setError } = useTunnels();
@@ -50,6 +51,7 @@ export function WorkspacePage() {
         <header>
           <span>{t("РАБОЧЕЕ ПРОСТРАНСТВО / VPN")}</span>
           <div className="header-actions">
+            <ThemeSwitcher />
             <LanguageSwitcher />
             <button
               className="local connections-trigger"

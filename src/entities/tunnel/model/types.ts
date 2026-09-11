@@ -52,6 +52,22 @@ declare global {
           language: "ru" | "en";
         }) => void,
       ) => () => void;
+      getTheme: () => Promise<{
+        preference: "system" | "light" | "dark";
+        theme: "light" | "dark";
+      }>;
+      setTheme: (
+        preference: "system" | "light" | "dark",
+      ) => Promise<{
+        preference: "system" | "light" | "dark";
+        theme: "light" | "dark";
+      }>;
+      onThemeChange: (
+        listener: (theme: {
+          preference: "system" | "light" | "dark";
+          theme: "light" | "dark";
+        }) => void,
+      ) => () => void;
       readConfig: (id: string) => Promise<{ text: string; revision: string }>;
       saveConfig: (
         id: string,

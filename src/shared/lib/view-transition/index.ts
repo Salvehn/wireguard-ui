@@ -18,7 +18,7 @@ const apply = () => {
 /** Batch same-tick updates into one snapshot; never leave stale updates behind on interruption. */
 export function animate(
   update: () => void,
-  kind: "default" | "language" = "default",
+  kind: "default" | "language" | "theme" = "default",
 ) {
   if (applying) {
     update();
@@ -41,6 +41,7 @@ export function animate(
     "language-transition",
     kind === "language",
   );
+  document.documentElement.classList.toggle("theme-transition", kind === "theme");
   document.documentElement.classList.add("view-transitioning");
   const transition = document.startViewTransition(() => {
     try {
@@ -60,6 +61,7 @@ export function animate(
         document.documentElement.classList.remove(
           "view-transitioning",
           "language-transition",
+          "theme-transition",
         );
       }
     });
