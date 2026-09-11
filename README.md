@@ -4,7 +4,7 @@ macOS-клиент на Electron + React/TypeScript: параллельные т
 
 ## Установка
 
-Откройте `WireGuard-Desktop-0.2.1-arm64.dmg` и перетащите приложение в Applications / «Программы». Запускайте через Spotlight: **WireGuard Desktop**.
+Откройте `WireGuard-Desktop-0.2.2-arm64.dmg` и перетащите приложение в Applications / «Программы». Запускайте через Spotlight: **WireGuard Desktop**.
 
 При первом запуске macOS один раз запрашивает разрешение администратора для установки системного помощника. После установки подключение, отключение, определение интерфейсов и статистика работают без повторных запросов пароля. При отмене можно повторить через «Настроить доступ».
 
@@ -43,6 +43,8 @@ npm test
 npm run package
 npm run dist:mac
 ```
+
+Для сборки требуется Node.js 20.19+ или 22.12+ (рекомендуется Node 24 LTS).
 
 Для подготовки распространяемого backend на машине сборки нужны Homebrew-пакеты `bash wireguard-tools wireguard-go` и standalone Node (официальный Node/NVM). Скрипт проверяет, что бинарники используют только системные dylib. Для явного выбора Node задайте `WG_NODE_RUNTIME=/path/to/node`.
 
