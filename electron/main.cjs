@@ -9,12 +9,13 @@ const helperClient=require('./helper-client.cjs');
 const {assertUniqueProfile}=require('./profile-identity.cjs');
 const {createLocale}=require('./locale.cjs');
 const {createTheme}=require('./theme.cjs');
+const {shutdownTunnels}=require('./shutdown.cjs');
 let locale;const t=(source,values)=>locale?.t(source,values)||source;
 let theme;
 let refreshLocaleUI=()=>{};
 let importing=false;
 let runtime;let helper={status:'required',message:''};let helperSnapshot={profiles:{},updatedAt:0};let snapshotPending=null;let helperSetup=null;
-let win,popover,tray,quitting=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
+let win,popover,tray,quitting=false,closing=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
 const log=message=>{logs=[...logs,{time:Date.now(),message:redact(message)}].slice(-100)};
 async function backend(){return helper.status==='ready'?'WireGuard Desktop Helper':null}
 async function updateSnapshot(ids,force=false){
@@ -105,8 +106,10 @@ app.whenReady().then(async()=>{
  applyAppearance();secureWindow(popover);popover.loadFile(path.join(__dirname,'../dist/index.html'),{hash:'tray'});popover.on('blur',()=>popover.hide());
  tray=new Tray(trayIcon());tray.setToolTip('WireGuard Desktop');
  const togglePopover=()=>{if(popover.isVisible()){popover.hide();return}const anchor=tray.getBounds();const area=screen.getDisplayNearestPoint({x:anchor.x,y:anchor.y}).workArea;popover.setPosition(Math.max(area.x,Math.min(anchor.x+Math.round(anchor.width/2)-180,area.x+area.width-360)),Math.max(area.y,anchor.y+anchor.height+5));popover.show();popover.focus()};
- tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:t('Открыть WireGuard Desktop'),click:()=>{win.show();win.focus()}},{label:t('Завершить приложение (туннели останутся активны)'),click:()=>app.quit()}])));
+ tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:t('Открыть WireGuard Desktop'),click:()=>{win.show();win.focus()}},{label:t('Завершить приложение (отключить туннели)'),click:()=>app.quit()}])));
  const updateTray=async()=>{publishLocale();try{const all=await profiles();const count=all.filter(p=>p.active).length;tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · '+t('Активно:')+' '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · '+t('Ошибка чтения состояния'))}};
- void setupHelper().then(updateTray);const timer=setInterval(updateTray,2500);app.on('before-quit',()=>{quitting=true;clearInterval(timer)});
+ void setupHelper().then(updateTray);const timer=setInterval(updateTray,2500);
+ // Quit must bring down active tunnels first: the helper daemon outlives the app.
+ app.on('before-quit',event=>{quitting=true;clearInterval(timer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});
  const updateMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate([{label:app.name,submenu:[{role:'about',label:t('О программе')},{label:t('Быстрые подключения'),accelerator:'CommandOrControl+Shift+T',click:togglePopover},{role:'quit',label:t('Завершить')}]},{label:t('Правка'),submenu:[{role:'undo',label:t('Отмена')},{role:'redo',label:t('Повторить')},{type:'separator'},{role:'cut',label:t('Вырезать')},{role:'copy',label:t('Копировать')},{role:'paste',label:t('Вставить')},{role:'selectAll',label:t('Выбрать всё')}]}]));refreshLocaleUI=updateMenu;updateMenu();app.on('activate',()=>{publishLocale();win.show();win.focus()});
 });
