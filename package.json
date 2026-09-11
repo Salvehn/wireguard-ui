@@ -47,7 +47,7 @@
     "directories": {
       "output": "release"
     },
-    "artifactName": "WireGuard-Desktop-${version}-${arch}.${ext}",
+    "artifactName": "WireGuard-Desktop-${arch}.${ext}",
     "dmg": {
       "title": "WireGuard Desktop",
       "background": "assets/dmg-background.png",
