@@ -1,3 +1,5 @@
+import type { UpdateState } from "@/shared/lib/update";
+
 export type Peer = {
   publicKey: string;
   endpoint: string;
@@ -40,9 +42,7 @@ declare global {
         preference: "system" | "ru" | "en";
         language: "ru" | "en";
       }>;
-      setLocale: (
-        preference: "system" | "ru" | "en",
-      ) => Promise<{
+      setLocale: (preference: "system" | "ru" | "en") => Promise<{
         preference: "system" | "ru" | "en";
         language: "ru" | "en";
       }>;
@@ -56,9 +56,7 @@ declare global {
         preference: "system" | "light" | "dark";
         theme: "light" | "dark";
       }>;
-      setTheme: (
-        preference: "system" | "light" | "dark",
-      ) => Promise<{
+      setTheme: (preference: "system" | "light" | "dark") => Promise<{
         preference: "system" | "light" | "dark";
         theme: "light" | "dark";
       }>;
@@ -68,6 +66,11 @@ declare global {
           theme: "light" | "dark";
         }) => void,
       ) => () => void;
+      getUpdateState: () => Promise<UpdateState>;
+      checkForUpdates: () => Promise<UpdateState>;
+      downloadUpdate: () => Promise<UpdateState>;
+      installUpdate: () => Promise<UpdateState>;
+      onUpdateState: (listener: (state: UpdateState) => void) => () => void;
       readConfig: (id: string) => Promise<{ text: string; revision: string }>;
       saveConfig: (
         id: string,

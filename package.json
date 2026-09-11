@@ -1,6 +1,6 @@
 {
   "name": "wireguard-ui",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -12,7 +12,10 @@
     "package": "npm run prepare:helper && npm run build && electron-builder --mac dir",
     "check:architecture": "node scripts/check-architecture.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "dist:mac": "npm run prepare:helper && npm run build && electron-builder --mac dmg --arm64",
+    "dist:mac": "npm run prepare:helper && npm run build && electron-builder --mac dmg zip --arm64",
+    "release:mac": "npm run dist:mac && npm run update:manifest && node scripts/publish-release.mjs",
+    "update:keygen": "node scripts/generate-update-key.mjs",
+    "update:manifest": "node scripts/generate-update-manifest.mjs",
     "prepare:helper": "node scripts/prepare-helper.mjs"
   },
   "dependencies": {
@@ -36,14 +39,20 @@
     "files": [
       "dist/**/*",
       "electron/*.cjs",
+      "electron/update-public-key.pem",
       "src/shared/lib/i18n/en.json",
       "!electron/*.test.cjs",
       "assets/wireguard.icns"
     ],
     "mac": {
       "category": "public.app-category.utilities",
-      "identity": null,
-      "icon": "assets/wireguard.icns"
+      "icon": "assets/wireguard.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "directories": {
       "output": "release"

@@ -1,5 +1,5 @@
-const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme} = require('electron');
-const fs=require('node:fs/promises'), path=require('node:path'),crypto=require('node:crypto');
+const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme,net} = require('electron');
+const fs=require('node:fs/promises'), fsSync=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {parseConfig,redact}=require('./config.cjs');
 const {routeNotes,TunnelController}=require('./tunnels.cjs');
 
@@ -10,12 +10,14 @@ const {assertUniqueProfile}=require('./profile-identity.cjs');
 const {createLocale}=require('./locale.cjs');
 const {createTheme}=require('./theme.cjs');
 const {shutdownTunnels}=require('./shutdown.cjs');
+const {createAppUpdater}=require('./updater.cjs');
+const {launchUpdateWorker,markUpdateHealthy}=require('./update-worker.cjs');
 let locale;const t=(source,values)=>locale?.t(source,values)||source;
 let theme;
 let refreshLocaleUI=()=>{};
 let importing=false;
 let runtime;let helper={status:'required',message:''};let helperSnapshot={profiles:{},updatedAt:0};let snapshotPending=null;let helperSetup=null;
-let win,popover,tray,quitting=false,closing=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
+let win,popover,tray,trayTimer,quitting=false,closing=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
 const log=message=>{logs=[...logs,{time:Date.now(),message:redact(message)}].slice(-100)};
 async function backend(){return helper.status==='ready'?'WireGuard Desktop Helper':null}
 async function updateSnapshot(ids,force=false){
@@ -48,6 +50,15 @@ app.whenReady().then(async()=>{
  }});
  const authorized=event=>{if(event.sender!==win?.webContents&&event.sender!==popover?.webContents)throw Error('Unknown sender')};
  const mainOnly=event=>{if(event.sender!==win?.webContents)throw Error('Main window required')};
+ const updateRolledBack=process.argv.includes('--update-rollback');
+ const updater=createAppUpdater({app,fetch:(url,options)=>net.fetch(url,options),publicKey:fsSync.readFileSync(path.join(__dirname,'update-public-key.pem')),startupError:updateRolledBack?'Не удалось запустить новую версию. Предыдущая версия восстановлена.':'',publish:updateState=>{for(const window of BrowserWindow.getAllWindows())window.webContents.send('update-state-changed',updateState)},installUpdate:async update=>{
+   await launchUpdateWorker({app,...update});quitting=true;if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;
+   await shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message));app.quit();
+ }});
+ ipcMain.handle('get-update-state',e=>{authorized(e);return updater.getState()});
+ ipcMain.handle('check-for-updates',e=>{mainOnly(e);return updater.check()});
+ ipcMain.handle('download-update',e=>{mainOnly(e);return updater.download()});
+ ipcMain.handle('install-update',e=>{mainOnly(e);return updater.install()});
  let lastLocale=JSON.stringify(locale.get());
  const publishLocale=()=>{const current=locale.get();const signature=JSON.stringify(current);if(signature!==lastLocale){lastLocale=signature;for(const window of BrowserWindow.getAllWindows())window.webContents.send('locale-changed',current);refreshLocaleUI()}return current};
  ipcMain.handle('get-locale',e=>{authorized(e);return publishLocale()});
@@ -102,14 +113,15 @@ app.whenReady().then(async()=>{
    const icon=nativeImage.createFromPath(path.join(__dirname,'../dist/wireguard.png')).resize({width:22,height:22});icon.setTemplateImage(true);return icon;
  }
  createWindow();
+ win.webContents.once('did-finish-load',()=>{void markUpdateHealthy(app).catch(error=>log(error.message));if(!updateRolledBack)setTimeout(()=>{void updater.check()},4000)});
  popover=new BrowserWindow({width:360,height:440,show:false,frame:false,resizable:false,skipTaskbar:true,alwaysOnTop:true,backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  applyAppearance();secureWindow(popover);popover.loadFile(path.join(__dirname,'../dist/index.html'),{hash:'tray'});popover.on('blur',()=>popover.hide());
  tray=new Tray(trayIcon());tray.setToolTip('WireGuard Desktop');
  const togglePopover=()=>{if(popover.isVisible()){popover.hide();return}const anchor=tray.getBounds();const area=screen.getDisplayNearestPoint({x:anchor.x,y:anchor.y}).workArea;popover.setPosition(Math.max(area.x,Math.min(anchor.x+Math.round(anchor.width/2)-180,area.x+area.width-360)),Math.max(area.y,anchor.y+anchor.height+5));popover.show();popover.focus()};
  tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:t('Открыть WireGuard Desktop'),click:()=>{win.show();win.focus()}},{label:t('Завершить приложение (отключить туннели)'),click:()=>app.quit()}])));
  const updateTray=async()=>{publishLocale();try{const all=await profiles();const count=all.filter(p=>p.active).length;tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · '+t('Активно:')+' '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · '+t('Ошибка чтения состояния'))}};
- void setupHelper().then(updateTray);const timer=setInterval(updateTray,2500);
+ void setupHelper().then(updateTray);trayTimer=setInterval(updateTray,2500);
  // Quit must bring down active tunnels first: the helper daemon outlives the app.
- app.on('before-quit',event=>{quitting=true;clearInterval(timer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});
+ app.on('before-quit',event=>{quitting=true;if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});
  const updateMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate([{label:app.name,submenu:[{role:'about',label:t('О программе')},{label:t('Быстрые подключения'),accelerator:'CommandOrControl+Shift+T',click:togglePopover},{role:'quit',label:t('Завершить')}]},{label:t('Правка'),submenu:[{role:'undo',label:t('Отмена')},{role:'redo',label:t('Повторить')},{type:'separator'},{role:'cut',label:t('Вырезать')},{role:'copy',label:t('Копировать')},{role:'paste',label:t('Вставить')},{role:'selectAll',label:t('Выбрать всё')}]}]));refreshLocaleUI=updateMenu;updateMenu();app.on('activate',()=>{publishLocale();win.show();win.focus()});
 });

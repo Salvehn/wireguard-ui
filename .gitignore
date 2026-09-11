@@ -10,5 +10,7 @@ work/
 .env
 .env.*
 !.env.example
+.update-keys/
 *.pem
+!electron/update-public-key.pem
 *.key

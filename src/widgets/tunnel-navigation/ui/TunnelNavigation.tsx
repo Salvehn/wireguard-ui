@@ -2,6 +2,7 @@ import { t } from "@/shared/lib/i18n";
 import { BrandIcon } from "@/shared/ui/brand-icon";
 import { Plus, Network } from "lucide-react";
 import type { Profile, State } from "@/entities/tunnel";
+import { AppUpdate } from "@/features/update-app";
 export function TunnelNavigation({
   data,
   profile,
@@ -67,6 +68,7 @@ export function TunnelNavigation({
             ? t("Системный помощник готов")
             : t("Нужен системный доступ")}
       </div>
+      <AppUpdate />
     </aside>
   );
 }

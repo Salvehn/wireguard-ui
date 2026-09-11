@@ -46,6 +46,9 @@
 .error {
   animation: panel-enter 180ms var(--ease-out);
 }
+.update-panel {
+  animation: panel-enter 160ms var(--ease-out);
+}
 .spinner {
   flex-shrink: 0;
   animation: spin 900ms linear infinite;

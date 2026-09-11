@@ -30,3 +30,9 @@ If macOS blocks the app, open **System Settings → Privacy & Security → Open 
 - Traffic statistics refresh automatically. An active tunnel alone does not guarantee that the server is reachable.
 
 [All releases](https://github.com/Salvehn/wireguard-ui/releases) · [Report an issue](https://github.com/Salvehn/wireguard-ui/issues)
+
+## Publishing an update
+
+The app verifies updates with its own Ed25519 key, so an Apple Developer subscription is not required. Back up `.update-keys/update-private.pem` securely and never commit or share it: every future update must be signed with this key.
+
+Increment `version` in `package.json`, commit the release, then run `GH_TOKEN=… npm run release:mac`. The command builds the DMG and ZIP, signs `update-arm64.json`, uploads all assets to a draft GitHub Release, and publishes it only after every upload succeeds.

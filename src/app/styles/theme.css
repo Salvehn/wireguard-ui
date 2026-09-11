@@ -71,6 +71,43 @@ html[data-theme="light"] .section-label,
 html[data-theme="light"] .sidebar-foot {
   color: #65796b;
 }
+html[data-theme="light"] .version-button {
+  color: #65796b;
+}
+html[data-theme="light"] .version-button:hover,
+html[data-theme="light"] .version-button[aria-expanded="true"] {
+  background: #dfe9e2;
+  border-color: #c3d4c8;
+  color: #365642;
+}
+html[data-theme="light"] .version-button.update-available {
+  color: #2c6740;
+}
+html[data-theme="light"] .update-panel {
+  background: #fff;
+  border-color: #c6d8cb;
+  box-shadow: 0 14px 36px #294c3530;
+}
+html[data-theme="light"] .update-close {
+  color: #64796b;
+}
+html[data-theme="light"] .update-progress {
+  background: #dce7df;
+}
+html[data-theme="light"] .update-progress span {
+  background: #3f8054;
+}
+html[data-theme="light"] .update-panel .update-metrics {
+  color: #60796a;
+}
+html[data-theme="light"] .update-panel .update-error {
+  color: #895233;
+}
+html[data-theme="light"] .update-action {
+  background: #e4efe7;
+  border-color: #acc8b5;
+  color: #2f6040;
+}
 html[data-theme="light"] .brand,
 html[data-theme="light"] .shield,
 html[data-theme="light"] .empty-icon,

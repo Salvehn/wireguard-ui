@@ -147,6 +147,112 @@ i.online {
   gap: 8px;
   padding: 0 10px;
 }
+.app-update {
+  position: relative;
+  margin-top: 8px;
+  -webkit-app-region: no-drag;
+}
+.version-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #718078;
+  font-size: 10px;
+  text-align: left;
+}
+.version-button:hover,
+.version-button[aria-expanded="true"] {
+  background: #202824;
+  border-color: #334039;
+  color: #b6c4bc;
+}
+.version-button.update-available {
+  color: #bdeacb;
+}
+.version-button .spinner {
+  width: 13px;
+  height: 13px;
+}
+.update-panel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: 214px;
+  padding: 14px;
+  border: 1px solid #3d4b43;
+  border-radius: 11px;
+  background: #19211d;
+  box-shadow: 0 14px 36px #0006;
+}
+.update-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.update-panel-heading strong {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.update-close {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: #87968e;
+}
+.update-panel p {
+  margin-top: 8px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.update-panel .update-error {
+  color: #e6bfa4;
+}
+.update-progress {
+  height: 6px;
+  margin-top: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #303a35;
+}
+.update-progress span {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  border-radius: inherit;
+  background: #a4e3b8;
+  transition: width 180ms ease;
+}
+.update-panel .update-metrics {
+  color: #92a69b;
+  font-variant-numeric: tabular-nums;
+}
+.update-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid #486151;
+  border-radius: 7px;
+  background: #26352c;
+  color: #c3e7ce;
+  font-size: 11px;
+}
+.update-action.primary {
+  color: #182b1d;
+}
 main {
   flex: 1;
   min-width: 0;
