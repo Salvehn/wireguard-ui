@@ -26,7 +26,7 @@ If macOS blocks the app, open **System Settings → Privacy & Security → Open 
 
 - The app follows your system language and appearance. You can choose English or Russian, and light or dark theme, manually at the top of the window.
 - Your configurations and keys stay on your Mac.
-- Closing the window or quitting the app does not disconnect your VPN. Use **Disconnect** to stop a tunnel.
+- Closing the window keeps the app and your tunnels running in the menu bar. Quitting the app disconnects all active tunnels; use **Disconnect** to stop a single tunnel.
 - Traffic statistics refresh automatically. An active tunnel alone does not guarantee that the server is reachable.
 
 [All releases](https://github.com/Salvehn/wireguard-ui/releases) · [Report an issue](https://github.com/Salvehn/wireguard-ui/issues)
