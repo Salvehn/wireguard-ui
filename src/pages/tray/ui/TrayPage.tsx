@@ -1,3 +1,4 @@
+import { t, message } from "@/shared/lib/i18n";
 import { useEffect, useState } from "react";
 import { BrandIcon } from "@/shared/ui/brand-icon";
 import { ArrowUpRight } from "lucide-react";
@@ -30,23 +31,24 @@ export function TrayPage() {
           <strong>WireGuard Desktop</strong>
           <p>
             {ready
-              ? data.profiles.filter((p) => p.active).length +
-                " активных туннелей"
-              : "Загрузка…"}
+              ? t("Активных туннелей: {count}", {
+                  count: data.profiles.filter((p) => p.active).length,
+                })
+              : t("Загрузка…")}
           </p>
         </div>
       </div>
       {error && (
         <div className="error" role="alert">
-          {error}
+          {message(error)}
         </div>
       )}
       <div className="tray-list">
         {data.helper.status !== "ready" && (
-          <p>Откройте приложение для настройки системного доступа.</p>
+          <p>{t("Откройте приложение для настройки системного доступа.")}</p>
         )}
         {data?.profiles.length === 0 && (
-          <p>Добавьте конфигурацию в основном окне.</p>
+          <p>{t("Добавьте конфигурацию в основном окне.")}</p>
         )}
         {data?.profiles.map((p) => {
           const busy = !!data.operations[p.id] || pending.includes(p.id);
@@ -61,12 +63,12 @@ export function TrayPage() {
                 <small>
                   <i className={p.active ? "online" : ""} />
                   {busy
-                    ? "Выполняется операция…"
+                    ? t("Выполняется операция…")
                     : p.statusUnknown
-                      ? "Нужно проверить"
+                      ? t("Нужно проверить")
                       : p.active
-                        ? "Интерфейс активен"
-                        : "Отключён"}
+                        ? t("Интерфейс активен")
+                        : t("Отключён")}
                 </small>
               </div>
               <button
@@ -75,10 +77,10 @@ export function TrayPage() {
                 aria-checked={p.active}
                 aria-label={
                   (p.statusUnknown
-                    ? "Проверить "
+                    ? t("Проверить ")
                     : p.active
-                      ? "Отключить "
-                      : "Подключить ") + p.name
+                      ? t("Отключить ")
+                      : t("Подключить ")) + p.name
                 }
                 disabled={busy || !data.backend}
                 aria-busy={busy}
@@ -92,10 +94,10 @@ export function TrayPage() {
       </div>
       <div className="tray-footer">
         <button className="primary" onClick={() => tunnelApi.openMain()}>
-          Открыть приложение
+          {t("Открыть приложение")}
           <ArrowUpRight size={16} />
         </button>
-        <small>Закрытие окна оставляет клиент в строке меню.</small>
+        <small>{t("Закрытие окна оставляет клиент в строке меню.")}</small>
       </div>
     </div>
   );

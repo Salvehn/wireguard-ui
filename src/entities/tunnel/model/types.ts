@@ -31,11 +31,27 @@ export type State = {
     status: "required" | "installing" | "ready" | "error";
     message: string;
   };
-  logs: { time: string; message: string }[];
+  logs: { time: number; message: string }[];
 };
 declare global {
   interface Window {
     wireguard: {
+      getLocale: () => Promise<{
+        preference: "system" | "ru" | "en";
+        language: "ru" | "en";
+      }>;
+      setLocale: (
+        preference: "system" | "ru" | "en",
+      ) => Promise<{
+        preference: "system" | "ru" | "en";
+        language: "ru" | "en";
+      }>;
+      onLocaleChange: (
+        listener: (locale: {
+          preference: "system" | "ru" | "en";
+          language: "ru" | "en";
+        }) => void,
+      ) => () => void;
       readConfig: (id: string) => Promise<{ text: string; revision: string }>;
       saveConfig: (
         id: string,

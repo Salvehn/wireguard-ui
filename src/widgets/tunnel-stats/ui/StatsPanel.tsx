@@ -1,3 +1,4 @@
+import { t, getLanguage } from "@/shared/lib/i18n";
 import { Spinner } from "@/shared/ui/spinner";
 import type { Profile } from "@/entities/tunnel";
 import { Card } from "@/shared/ui/card";
@@ -16,12 +17,12 @@ export function StatsPanel({
     <section className="stats-panel">
       <div className="stats-heading">
         <div>
-          <strong>Связь с peers</strong>
+          <strong>{t("Связь с peers")}</strong>
           <p>
-            {profile.interfaceName || "Интерфейс не поднят"}
+            {profile.interfaceName || t("Интерфейс не поднят")}
             {stats
-              ? " · Обновлено " +
-                new Date(stats.updatedAt).toLocaleTimeString("ru")
+              ? t(" · Обновлено ") +
+                new Date(stats.updatedAt).toLocaleTimeString(getLanguage())
               : ""}
           </p>
         </div>
@@ -30,25 +31,29 @@ export function StatsPanel({
           disabled={(!profile.active && !profile.statusUnknown) || pending}
           onClick={refresh}
         >
-          <span style={{ width: 14, height: 14 }}>{pending && <Spinner />}</span>
-          Обновить статистику
+          <span style={{ width: 14, height: 14 }}>
+            {pending && <Spinner />}
+          </span>
+          {t("Обновить статистику")}
         </button>
       </div>
       {!stats ? (
         <p className="stats-empty">
           {profile.active || profile.statusUnknown
-            ? "Помощник получает handshake и трафик автоматически. Можно обновить данные сейчас."
-            : "Handshake и трафик доступны после подключения."}
+            ? t(
+                "Помощник получает handshake и трафик автоматически. Можно обновить данные сейчас.",
+              )
+            : t("Handshake и трафик доступны после подключения.")}
         </p>
       ) : (
         <>
           <div className="traffic">
             <Card
-              label="ПОЛУЧЕНО ↓"
+              label={t("ПОЛУЧЕНО ↓")}
               value={bytes(stats.peers.reduce((sum, p) => sum + p.rx, 0))}
             />
             <Card
-              label="ОТПРАВЛЕНО ↑"
+              label={t("ОТПРАВЛЕНО ↑")}
               value={bytes(stats.peers.reduce((sum, p) => sum + p.tx, 0))}
             />
           </div>
@@ -71,26 +76,26 @@ export function StatsPanel({
                   }
                 >
                   {!peer.lastHandshake
-                    ? "Нет handshake"
+                    ? t("Нет handshake")
                     : Date.now() / 1000 - peer.lastHandshake < 180
-                      ? "Недавний handshake"
-                      : "Давно нет handshake"}
+                      ? t("Недавний handshake")
+                      : t("Давно нет handshake")}
                 </span>
               </div>
               <dl>
-                <dt>Последний handshake</dt>
+                <dt>{t("Последний handshake")}</dt>
                 <dd>{handshake(peer.lastHandshake)}</dd>
                 <dt>Endpoint</dt>
                 <dd>{peer.endpoint}</dd>
-                <dt>Получено / отправлено</dt>
+                <dt>{t("Получено / отправлено")}</dt>
                 <dd>
                   {bytes(peer.rx)} / {bytes(peer.tx)}
                 </dd>
                 <dt>Keepalive</dt>
                 <dd>
                   {peer.keepalive === "off"
-                    ? "Выключен"
-                    : peer.keepalive + " сек."}
+                    ? t("Выключен")
+                    : peer.keepalive + t(" сек.")}
                 </dd>
                 <dt>Allowed IPs</dt>
                 <dd>{peer.allowedIPs}</dd>
@@ -98,8 +103,9 @@ export function StatsPanel({
             </div>
           ))}
           <p className="stats-empty">
-            Счётчики с момента запуска интерфейса. Давний handshake может
-            означать отсутствие трафика; это не проверка интернета.
+            {t(
+              "Счётчики с момента запуска интерфейса. Давний handshake может означать отсутствие трафика; это не проверка интернета.",
+            )}
           </p>
         </>
       )}

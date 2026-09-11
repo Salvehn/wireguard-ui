@@ -16,7 +16,10 @@ const apply = () => {
   });
 };
 /** Batch same-tick updates into one snapshot; never leave stale updates behind on interruption. */
-export function animate(update: () => void) {
+export function animate(
+  update: () => void,
+  kind: "default" | "language" = "default",
+) {
   if (applying) {
     update();
     return;
@@ -34,6 +37,10 @@ export function animate(update: () => void) {
   if (capturing) return;
   active?.skipTransition();
   capturing = true;
+  document.documentElement.classList.toggle(
+    "language-transition",
+    kind === "language",
+  );
   document.documentElement.classList.add("view-transitioning");
   const transition = document.startViewTransition(() => {
     try {
@@ -50,7 +57,10 @@ export function animate(update: () => void) {
       if (active === transition) {
         active = null;
         capturing = false;
-        document.documentElement.classList.remove("view-transitioning");
+        document.documentElement.classList.remove(
+          "view-transitioning",
+          "language-transition",
+        );
       }
     });
 }

@@ -219,3 +219,36 @@ main > header {
     animation: none !important;
   }
 }
+
+/* One root snapshot keeps language changes soft without animating panel geometry. */
+html.language-transition * {
+  view-transition-name: none !important;
+}
+@keyframes language-out {
+  to {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+@keyframes language-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+html.language-transition::view-transition-old(root) {
+  animation: language-out 140ms ease-in both;
+}
+html.language-transition::view-transition-new(root) {
+  animation: language-in 200ms 70ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.language-transition::view-transition-old(root),
+  html.language-transition::view-transition-new(root) {
+    animation: none !important;
+  }
+}

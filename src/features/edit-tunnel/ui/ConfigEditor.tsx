@@ -1,3 +1,4 @@
+import { t, message } from "@/shared/lib/i18n";
 import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
 import { useEffect, useState } from "react";
@@ -67,37 +68,38 @@ export function ConfigEditor({
         className="config-editor"
         role="dialog"
         aria-modal="true"
-        aria-label="Редактор конфигурации"
+        aria-label={t("Редактор конфигурации")}
       >
         <div className="editor-heading">
           <div>
-            <h2>Конфигурация</h2>
+            <h2>{t("Конфигурация")}</h2>
             <p>{profile.name}</p>
           </div>
           <button
             className="icon"
-            aria-label="Закрыть редактор"
+            aria-label={t("Закрыть редактор")}
             onClick={dismiss}
           >
             <X size={18} />
           </button>
         </div>
         <p className="editor-note">
-          Ключи скрыты маркерами &lt;UNCHANGED_KEY_…&gt;. Оставьте их для
-          сохранения текущих ключей или вставьте новые.
+          {t(
+            "Ключи скрыты маркерами <UNCHANGED_KEY_…>. Оставьте их для сохранения текущих ключей или вставьте новые.",
+          )}
         </p>
         {profile.active && (
           <p className="editor-note">
-            Для сохранения сначала отключите этот туннель.
+            {t("Для сохранения сначала отключите этот туннель.")}
           </p>
         )}
         {error && (
           <div className="error" role="alert">
-            {error}
+            {message(error)}
           </div>
         )}
         <textarea
-          aria-label="Конфигурация WireGuard"
+          aria-label={t("Конфигурация WireGuard")}
           autoFocus
           spellCheck={false}
           autoCorrect="off"
@@ -109,21 +111,21 @@ export function ConfigEditor({
         <div className="editor-actions">
           {discard ? (
             <>
-              <span>Отменить несохранённые изменения?</span>
+              <span>{t("Отменить несохранённые изменения?")}</span>
               <button
                 className="icon"
                 onClick={() => animate(() => setDiscard(false))}
               >
-                Продолжить
+                {t("Продолжить")}
               </button>
               <button className="icon" onClick={close}>
-                Отменить изменения
+                {t("Отменить изменения")}
               </button>
             </>
           ) : (
             <>
               <button className="icon" onClick={dismiss}>
-                Отмена
+                {t("Отмена")}
               </button>
               <button
                 className="primary"
@@ -131,7 +133,7 @@ export function ConfigEditor({
                 onClick={save}
               >
                 {saving && <Spinner />}
-                {saving ? "Сохранение…" : "Сохранить"}
+                {saving ? t("Сохранение…") : t("Сохранить")}
               </button>
             </>
           )}

@@ -1,3 +1,4 @@
+import { t, message } from "@/shared/lib/i18n";
 import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
 import { BrandIcon } from "@/shared/ui/brand-icon";
@@ -18,6 +19,7 @@ import { TunnelNavigation } from "@/widgets/tunnel-navigation";
 import { StatsPanel } from "@/widgets/tunnel-stats";
 import { EventLog } from "@/widgets/event-log";
 import { Card } from "@/shared/ui/card";
+import { LanguageSwitcher } from "@/features/change-language";
 export function WorkspacePage() {
   const { data, setData, ready, error, setError } = useTunnels();
   const { pending, perform } = useTunnelActions(setData, setError);
@@ -46,65 +48,84 @@ export function WorkspacePage() {
       />
       <main>
         <header>
-          <span>РАБОЧЕЕ ПРОСТРАНСТВО / VPN</span>
-          <button
-            className="local connections-trigger"
-            popoverTarget="active-connections"
-            aria-expanded={connectionsOpen}
-            aria-controls="active-connections"
-          >
-            <i className={activeProfiles.length ? "online" : ""} />
-            Активно: {activeProfiles.length} / {data.profiles.length}
-            <ChevronDown size={13} />
-          </button>
-          <div
-            id="active-connections"
-            className="connections-popover"
-            popover="auto"
-            ref={connectionsPopover}
-            onToggle={(event) => setConnectionsOpen(event.newState === "open")}
-            role="region"
-            aria-label="Активные соединения"
-          >
-            <strong>Активные соединения</strong>
-            {activeProfiles.length ? (
-              <div className="connections-list">
-                {activeProfiles.map((p) => (
-                  <div className="connection-row" key={p.id}>
-                  <button
-                    className="connection-select"
-                    aria-current={p.id === profile?.id ? "true" : undefined}
-                    onClick={() => {
-                      connectionsPopover.current?.hidePopover();
-                      if (p.id !== profile?.id) animate(() => select(p.id));
-                    }}
-                  >
-                    <i className="online" />
-                    <span>{p.name}</span>
-                    <ArrowUpRight size={14} />
-                  </button>
-                  <button
-                    className={"tray-switch " + (p.active ? "on" : "")}
-                    role="switch"
-                    aria-checked={p.active}
-                    aria-label={(p.active ? "Отключить " : "Подключить ") + p.name}
-                    aria-busy={!!data.operations[p.id] || pending.includes(p.id)}
-                    disabled={!!data.operations[p.id] || pending.includes(p.id) || !data.backend}
-                    onClick={() => perform(() => tunnelApi.setActive(p.id, !p.active), p.id)}
-                  >
-                    <span />
-                  </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p>Нет активных туннелей</p>
-            )}
+          <span>{t("РАБОЧЕЕ ПРОСТРАНСТВО / VPN")}</span>
+          <div className="header-actions">
+            <LanguageSwitcher />
+            <button
+              className="local connections-trigger"
+              popoverTarget="active-connections"
+              aria-expanded={connectionsOpen}
+              aria-controls="active-connections"
+            >
+              <i className={activeProfiles.length ? "online" : ""} />
+              {t("Активно:")} {activeProfiles.length} / {data.profiles.length}
+              <ChevronDown size={13} />
+            </button>
+            <div
+              id="active-connections"
+              className="connections-popover"
+              popover="auto"
+              ref={connectionsPopover}
+              onToggle={(event) =>
+                setConnectionsOpen(event.newState === "open")
+              }
+              role="region"
+              aria-label={t("Активные соединения")}
+            >
+              <strong>{t("Активные соединения")}</strong>
+              {activeProfiles.length ? (
+                <div className="connections-list">
+                  {activeProfiles.map((p) => (
+                    <div className="connection-row" key={p.id}>
+                      <button
+                        className="connection-select"
+                        aria-current={p.id === profile?.id ? "true" : undefined}
+                        onClick={() => {
+                          connectionsPopover.current?.hidePopover();
+                          if (p.id !== profile?.id) animate(() => select(p.id));
+                        }}
+                      >
+                        <i className="online" />
+                        <span>{p.name}</span>
+                        <ArrowUpRight size={14} />
+                      </button>
+                      <button
+                        className={"tray-switch " + (p.active ? "on" : "")}
+                        role="switch"
+                        aria-checked={p.active}
+                        aria-label={
+                          (p.active ? t("Отключить ") : t("Подключить ")) +
+                          p.name
+                        }
+                        aria-busy={
+                          !!data.operations[p.id] || pending.includes(p.id)
+                        }
+                        disabled={
+                          !!data.operations[p.id] ||
+                          pending.includes(p.id) ||
+                          !data.backend
+                        }
+                        onClick={() =>
+                          perform(
+                            () => tunnelApi.setActive(p.id, !p.active),
+                            p.id,
+                          )
+                        }
+                      >
+                        <span />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>{t("Нет активных туннелей")}</p>
+              )}
+            </div>
           </div>
         </header>
         {error && (
           <div className="error" role="alert">
-            {error}
+            {message(error)}
             <button onClick={() => animate(() => setError(""))}>×</button>
           </div>
         )}
@@ -113,12 +134,14 @@ export function WorkspacePage() {
             <div>
               <strong>
                 {data.helper.status === "installing"
-                  ? "Настройка системного доступа…"
-                  : "Нужен системный помощник"}
+                  ? t("Настройка системного доступа…")
+                  : t("Нужен системный помощник")}
               </strong>
               <p>
-                {data.helper.message ||
-                  "Один запрос администратора при установке. Затем VPN работает без повторного ввода пароля."}
+                {message(data.helper.message) ||
+                  t(
+                    "Один запрос администратора при установке. Затем VPN работает без повторного ввода пароля.",
+                  )}
               </p>
             </div>
             <button
@@ -132,7 +155,7 @@ export function WorkspacePage() {
               {data.helper.status === "installing" ? (
                 <Spinner />
               ) : (
-                "Настроить доступ"
+                t("Настроить доступ")
               )}
             </button>
           </div>
@@ -142,7 +165,7 @@ export function WorkspacePage() {
             <div className="title">
               <div>
                 <h1>{profile.name}</h1>
-                <p>Ваше соединение. Под вашим контролем.</p>
+                <p>{t("Ваше соединение. Под вашим контролем.")}</p>
               </div>
               <div className="title-actions">
                 <button
@@ -151,10 +174,10 @@ export function WorkspacePage() {
                   onClick={() => animate(() => setEditor(profile))}
                 >
                   <Pencil size={16} />
-                  Редактировать
+                  {t("Редактировать")}
                 </button>
                 <button
-                  aria-label="Удалить туннель"
+                  aria-label={t("Удалить туннель")}
                   className="icon"
                   disabled={
                     !!operation || profile.active || profile.statusUnknown
@@ -174,24 +197,26 @@ export function WorkspacePage() {
                 <BrandIcon size={64} />
               </div>
               <div>
-                <div className="eyebrow">СОСТОЯНИЕ ТУННЕЛЯ</div>
+                <div className="eyebrow">{t("СОСТОЯНИЕ ТУННЕЛЯ")}</div>
                 <h2>
                   {operation
                     ? operation.startsWith("queued")
-                      ? "В очереди…"
-                      : "Выполняется операция…"
+                      ? t("В очереди…")
+                      : t("Выполняется операция…")
                     : profile.statusUnknown
-                      ? "Нужно проверить состояние"
+                      ? t("Нужно проверить состояние")
                       : profile.active
-                        ? "Интерфейс активен"
-                        : "Готов к подключению"}
+                        ? t("Интерфейс активен")
+                        : t("Готов к подключению")}
                 </h2>
                 <p>
                   {profile.statusUnknown
-                    ? "Обнаружен системный туннель. Обновите его состояние через помощник."
+                    ? t(
+                        "Обнаружен системный туннель. Обновите его состояние через помощник.",
+                      )
                     : profile.active
-                      ? "Туннель поднят. Доступность сервера не проверена."
-                      : "Подключитесь, когда нужен защищённый маршрут."}
+                      ? t("Туннель поднят. Доступность сервера не проверена.")
+                      : t("Подключитесь, когда нужен защищённый маршрут.")}
                 </p>
               </div>
               <button
@@ -210,26 +235,26 @@ export function WorkspacePage() {
               >
                 {operation ? <Spinner /> : <Power size={16} />}
                 {operation
-                  ? "Ожидайте…"
+                  ? t("Ожидайте…")
                   : profile.statusUnknown
-                    ? "Проверить"
+                    ? t("Проверить")
                     : profile.active
-                      ? "Отключить"
-                      : "Подключить"}
+                      ? t("Отключить")
+                      : t("Подключить")}
               </button>
             </section>
             {profile.notes.length > 0 && (
               <div className="route-notes">
                 {profile.notes.map((note, i) => (
-                  <p key={i}>{note}</p>
+                  <p key={i}>{message(note)}</p>
                 ))}
               </div>
             )}
             <div className="details">
-              <Card label="АДРЕС ТУННЕЛЯ" value={profile.address} />
+              <Card label={t("АДРЕС ТУННЕЛЯ")} value={profile.address} />
               <Card label="DNS" value={profile.dns} />
               <Card label="ENDPOINT" value={profile.endpoint} />
-              <Card label="МАРШРУТЫ" value={profile.allowedIPs} />
+              <Card label={t("МАРШРУТЫ")} value={profile.allowedIPs} />
             </div>
             <StatsPanel
               profile={profile}
@@ -238,7 +263,8 @@ export function WorkspacePage() {
             />
             <div className="hint">
               <Activity size={15} />
-              {profile.peers} peer · Состояние обновляется каждые 2,5 секунды
+              {profile.peers}{" "}
+              {t("peer · Состояние обновляется каждые 2,5 секунды")}
             </div>
           </Fragment>
         ) : (
@@ -246,16 +272,16 @@ export function WorkspacePage() {
             <div className="empty-icon">
               <BrandIcon size={88} />
             </div>
-            <span className="eyebrow">ПРОСТОЕ УПРАВЛЕНИЕ WIREGUARD</span>
+            <span className="eyebrow">{t("ПРОСТОЕ УПРАВЛЕНИЕ WIREGUARD")}</span>
             <h1>
-              Меньше шума.
+              {t("Меньше шума.")}
               <br />
-              Больше контроля.
+              {t("Больше контроля.")}
             </h1>
             <p>
-              Добавьте конфигурацию WireGuard,
+              {t("Добавьте конфигурацию WireGuard,")}
               <br />
-              чтобы управлять подключением из одного окна.
+              {t("чтобы управлять подключением из одного окна.")}
             </p>
             <button
               className="primary"
@@ -263,16 +289,17 @@ export function WorkspacePage() {
               onClick={() => perform(tunnelApi.import)}
             >
               <Plus size={18} />
-              Добавить туннель
+              {t("Добавить туннель")}
               <ArrowUpRight size={17} />
             </button>
-            <small>Файл .conf · Ключи остаются на вашем Mac</small>
+            <small>{t("Файл .conf · Ключи остаются на вашем Mac")}</small>
           </section>
         )}
         <EventLog logs={data.logs} />
         <footer>
-          Изменения маршрутов выполняются по очереди. Подключённые туннели
-          работают параллельно.
+          {t(
+            "Изменения маршрутов выполняются по очереди. Подключённые туннели работают параллельно.",
+          )}
         </footer>
       </main>
       {editor && (

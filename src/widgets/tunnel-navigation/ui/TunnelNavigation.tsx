@@ -1,3 +1,4 @@
+import { t } from "@/shared/lib/i18n";
 import { BrandIcon } from "@/shared/ui/brand-icon";
 import { Plus, Network } from "lucide-react";
 import type { Profile, State } from "@/entities/tunnel";
@@ -27,7 +28,8 @@ export function TunnelNavigation({
         </strong>
       </div>
       <div className="section-label">
-        ТУННЕЛИ <span>{data.profiles.length}</span>
+        {t("ТУННЕЛИ")}
+        <span>{data.profiles.length}</span>
       </div>
       <nav>
         {data.profiles.map((p) => (
@@ -42,12 +44,12 @@ export function TunnelNavigation({
               {p.name}
               <small>
                 {data.operations[p.id] || pending.includes(p.id)
-                  ? "Выполняется операция…"
+                  ? t("Выполняется операция…")
                   : p.statusUnknown
-                    ? "Нужно проверить"
+                    ? t("Нужно проверить")
                     : p.active
-                      ? "Интерфейс активен"
-                      : "Отключён"}
+                      ? t("Интерфейс активен")
+                      : t("Отключён")}
               </small>
             </span>
             <i className={p.active ? "online" : ""} />
@@ -55,15 +57,15 @@ export function TunnelNavigation({
         ))}
       </nav>
       <button className="import" disabled={busy} onClick={onImport}>
-        <Plus size={17} /> Импорт конфигурации
+        <Plus size={17} /> {t("Импорт конфигурации")}
       </button>
       <div className="sidebar-foot">
         <i className={data.backend ? "online" : ""} />
         {!ready
-          ? "Проверка backend…"
+          ? t("Проверка backend…")
           : data.backend
-            ? "Системный помощник готов"
-            : "Нужен системный доступ"}
+            ? t("Системный помощник готов")
+            : t("Нужен системный доступ")}
       </div>
     </aside>
   );
