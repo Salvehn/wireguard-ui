@@ -70,8 +70,9 @@ export function WorkspacePage() {
             {activeProfiles.length ? (
               <div className="connections-list">
                 {activeProfiles.map((p) => (
+                  <div className="connection-row" key={p.id}>
                   <button
-                    key={p.id}
+                    className="connection-select"
                     aria-current={p.id === profile?.id ? "true" : undefined}
                     onClick={() => {
                       connectionsPopover.current?.hidePopover();
@@ -82,6 +83,18 @@ export function WorkspacePage() {
                     <span>{p.name}</span>
                     <ArrowUpRight size={14} />
                   </button>
+                  <button
+                    className={"tray-switch " + (p.active ? "on" : "")}
+                    role="switch"
+                    aria-checked={p.active}
+                    aria-label={(p.active ? "Отключить " : "Подключить ") + p.name}
+                    aria-busy={!!data.operations[p.id] || pending.includes(p.id)}
+                    disabled={!!data.operations[p.id] || pending.includes(p.id) || !data.backend}
+                    onClick={() => perform(() => tunnelApi.setActive(p.id, !p.active), p.id)}
+                  >
+                    <span />
+                  </button>
+                  </div>
                 ))}
               </div>
             ) : (

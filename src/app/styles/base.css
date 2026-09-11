@@ -785,7 +785,7 @@ nav::-webkit-scrollbar-corner,
 .connections-popover > strong { display: block; margin-bottom: 12px; }
 .connections-popover > p { color: #82988a; margin: 0; }
 .connections-list { display: grid; gap: 4px; }
-.connections-list button {
+.connections-list .connection-select {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -797,11 +797,14 @@ nav::-webkit-scrollbar-corner,
   color: inherit;
   text-align: left;
 }
-.connections-list button:hover, .connections-list button[aria-current] { background: #9ccfaa20; }
-.connections-list button span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
-.connections-list button > svg { flex-shrink: 0; }
+.connections-list .connection-select:hover, .connections-list .connection-select[aria-current] { background: #9ccfaa20; }
+.connections-list .connection-select span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
+.connections-list .connection-select > svg { flex-shrink: 0; }
 .connections-trigger:focus-visible, .connections-list button:focus-visible { outline: 2px solid #749980; outline-offset: 3px; }
 @media (prefers-color-scheme: light) {
   .connections-popover { background: #fff; color: #263c2d; border-color: #d6e2d9; }
   .connections-popover > p { color: #607468; }
 }
+
+.connection-row { display: flex; align-items: center; gap: 10px; }
+.connection-row .connection-select { flex: 1; min-width: 0; }
