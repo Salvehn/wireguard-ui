@@ -24,7 +24,7 @@ If macOS blocks the app, open **System Settings → Privacy & Security → Open 
 
 ## Good to know
 
-- The app follows your system language. You can choose English or Russian manually at the top of the window.
+- The app follows your system language and appearance. You can choose English or Russian, and light or dark theme, manually at the top of the window.
 - Your configurations and keys stay on your Mac.
 - Closing the window or quitting the app does not disconnect your VPN. Use **Disconnect** to stop a tunnel.
 - Traffic statistics refresh automatically. An active tunnel alone does not guarantee that the server is reachable.
