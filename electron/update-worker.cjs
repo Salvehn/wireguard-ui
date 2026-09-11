@@ -13,6 +13,13 @@ const exists = (file) =>
     () => true,
     () => false,
   );
+const removeTree = (directory) =>
+  fsp.rm(directory, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 200,
+  });
 
 async function sha512(file) {
   const hash = crypto.createHash("sha512");
@@ -146,7 +153,7 @@ async function worker(config) {
           result.version === config.version
         ) {
           swapped = false;
-          await fsp.rm(backup, { recursive: true, force: true });
+          await removeTree(backup);
           await fsp.rm(config.archivePath, { force: true });
           await fsp.rm(health, { force: true });
           return;
@@ -164,11 +171,11 @@ async function worker(config) {
         await fsp.rename(config.currentApp, failed);
       await fsp.rename(backup, config.currentApp);
       launch(config.currentApp, "--update-rollback").unref();
-      await fsp.rm(failed, { recursive: true, force: true });
+      await removeTree(failed);
     }
     throw error;
   } finally {
-    await fsp.rm(stage, { recursive: true, force: true }).catch(() => {});
+    await removeTree(stage).catch(() => {});
   }
 }
 
@@ -257,6 +264,7 @@ if (process.env.WG_UPDATE_WORKER === "1") {
   const workerFile = process.argv[1];
   const log = path.join(path.dirname(process.argv[1]), "update-worker.log");
   Promise.resolve()
+    .then(() => fsp.rm(log, { force: true }).catch(() => {}))
     .then(() =>
       worker(
         JSON.parse(Buffer.from(process.argv[2], "base64url").toString("utf8")),

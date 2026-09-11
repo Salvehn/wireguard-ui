@@ -58,6 +58,22 @@ test("atomically replaces an app and keeps the new version after its health sign
     ),
     false,
   );
+  assert.equal(
+    await fsp
+      .access(path.join(root, `.${path.basename(current)}.backup-${token}`))
+      .then(
+        () => true,
+        () => false,
+      ),
+    false,
+  );
+  assert.equal(
+    await fsp.access(path.join(userData, `update-health-${token}.json`)).then(
+      () => true,
+      () => false,
+    ),
+    false,
+  );
 });
 
 test("restores the previous app when the new version does not become healthy", async (t) => {
