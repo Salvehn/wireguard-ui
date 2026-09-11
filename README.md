@@ -1,32 +1,32 @@
 # WireGuard Desktop
 
-**Русский** · [English](README.en.md)
+[Русский](README.ru.md) · **English**
 
-Приложение для подключения к WireGuard VPN на Mac с Apple Silicon (M1 и новее).
+Connect to WireGuard VPN on a Mac with Apple Silicon (M1 or later).
 
-[**Скачать для Mac**](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-arm64.dmg)
+[**Download for Mac**](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-arm64.dmg)
 
-## Установка
+## Install
 
-1. Скачайте и откройте DMG.
-2. Перетащите **WireGuard Desktop** в **Программы**.
-3. Запустите приложение и подтвердите установку системного помощника паролем администратора. После этого включать и выключать VPN можно без повторного ввода пароля.
+1. Download and open the DMG.
+2. Drag **WireGuard Desktop** into **Applications**.
+3. Open the app and approve the system helper installation with your administrator password. You can then connect and disconnect without repeated password prompts.
 
-Если macOS блокирует запуск, откройте **Системные настройки → Конфиденциальность и безопасность → Всё равно открыть**. Приложение пока не подписано Apple.
+If macOS blocks the app, open **System Settings → Privacy & Security → Open Anyway**. The app is not yet signed with an Apple Developer ID.
 
-## Подключение
+## Connect
 
-1. Нажмите **Добавить туннель** или **Импорт конфигурации** и выберите файл `.conf`, полученный от вашего VPN-провайдера или администратора.
-2. Выберите добавленный туннель и нажмите **Подключить**.
-3. Чтобы завершить соединение, нажмите **Отключить**.
+1. Click **Add tunnel** or **Import configuration** and select the `.conf` file provided by your VPN provider or administrator.
+2. Select the tunnel and click **Connect**.
+3. Click **Disconnect** to end the connection.
 
-**Поддерживаются параллельные соединения:** можно подключить несколько туннелей одновременно и включать или отключать каждый независимо. Настройки доступны через **Редактировать**, а управление подключением — также через значок приложения в строке меню.
+**Parallel connections are supported:** keep multiple tunnels connected at once and connect or disconnect each independently. Use **Edit** to change a configuration, or the menu bar icon to manage connections.
 
-## Полезно знать
+## Good to know
 
-- Язык выбирается по системе. Русский или английский можно выбрать вручную в верхней части окна.
-- Конфиги и ключи хранятся на вашем Mac.
-- Закрытие окна и выход из приложения не отключают VPN. Отключайте туннель кнопкой **Отключить**.
-- Статистика трафика обновляется автоматически. Активный туннель сам по себе не гарантирует доступность сервера.
+- The app follows your system language. You can choose English or Russian manually at the top of the window.
+- Your configurations and keys stay on your Mac.
+- Closing the window or quitting the app does not disconnect your VPN. Use **Disconnect** to stop a tunnel.
+- Traffic statistics refresh automatically. An active tunnel alone does not guarantee that the server is reachable.
 
-[Все версии приложения](https://github.com/Salvehn/wireguard-ui/releases) · [Сообщить о проблеме](https://github.com/Salvehn/wireguard-ui/issues)
+[All releases](https://github.com/Salvehn/wireguard-ui/releases) · [Report an issue](https://github.com/Salvehn/wireguard-ui/issues)
