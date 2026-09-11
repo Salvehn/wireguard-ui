@@ -1,0 +1,221 @@
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes working {
+  50% {
+    opacity: 0.45;
+  }
+}
+.tray-panel {
+  animation: modal-enter 180ms var(--ease-out);
+}
+.error {
+  animation: panel-enter 180ms var(--ease-out);
+}
+.spinner {
+  flex-shrink: 0;
+  animation: spin 900ms linear infinite;
+}
+.stats-heading > .icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+button {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 180ms var(--ease-out);
+}
+.primary:hover:not(:disabled),
+.icon:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.primary:active:not(:disabled),
+.icon:active:not(:disabled),
+.import:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+.tunnel,
+.active-chips button {
+  transition:
+    background-color 160ms,
+    border-color 160ms,
+    color 160ms,
+    transform 160ms;
+}
+.tunnel:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.tray-switch span {
+  transition:
+    transform 220ms var(--ease-spring),
+    background-color 160ms;
+}
+.tray-switch[aria-busy="true"] span {
+  animation: working 900ms ease-in-out infinite;
+}
+.shield {
+  transition:
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+.connected .shield {
+  box-shadow: 0 0 0 4px #9ccfaa12;
+}
+i {
+  transition:
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .primary:hover:not(:disabled),
+  .icon:hover:not(:disabled),
+  .primary:active:not(:disabled),
+  .icon:active:not(:disabled),
+  .import:active:not(:disabled),
+  .tunnel:active:not(:disabled) {
+    transform: none;
+  }
+}
+/* Shared-element transitions keep panel geometry, selection and status changes connected. */
+.brand {
+  view-transition-name: brand;
+}
+main > header {
+  view-transition-name: workspace-header;
+}
+.active-summary {
+  view-transition-name: active-summary;
+}
+.title {
+  view-transition-name: tunnel-title;
+}
+.connection {
+  view-transition-name: connection;
+}
+.connection .shield {
+  view-transition-name: connection-icon;
+}
+.details {
+  view-transition-name: tunnel-details;
+}
+.stats-panel {
+  view-transition-name: tunnel-stats;
+}
+.journal {
+  view-transition-name: event-log;
+}
+.helper-notice {
+  view-transition-name: helper-notice;
+}
+.modal-backdrop {
+  view-transition-name: modal-backdrop;
+}
+.config-editor {
+  view-transition-name: config-editor;
+}
+.editor-actions {
+  view-transition-name: editor-actions;
+}
+.tray-heading {
+  view-transition-name: tray-heading;
+}
+.tray-footer {
+  view-transition-name: tray-footer;
+}
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(*) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(*),
+::view-transition-new(*) {
+  mix-blend-mode: normal;
+  animation-duration: 220ms;
+  animation-timing-function: ease-out;
+}
+@keyframes vt-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+@keyframes vt-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+::view-transition-new(config-editor) {
+  animation: vt-arrive 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+::view-transition-old(config-editor) {
+  animation: vt-leave 170ms ease-in both;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,97 @@
+const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme} = require('electron');
+const fs=require('node:fs/promises'), path=require('node:path'),crypto=require('node:crypto');
+const {parseConfig,redact}=require('./config.cjs');
+const {routeNotes,TunnelController}=require('./tunnels.cjs');
+
+const {maskConfig,restoreConfig,revision}=require('./editor.cjs');
+const {RuntimeStatus}=require('./runtime-status.cjs');
+const helperClient=require('./helper-client.cjs');
+const {assertUniqueProfile}=require('./profile-identity.cjs');
+let importing=false;
+let runtime;let helper={status:'required',message:''};let helperSnapshot={profiles:{},updatedAt:0};let snapshotPending=null;let helperSetup=null;
+let win,popover,tray,quitting=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
+const log=message=>{logs=[...logs,{time:new Date().toLocaleTimeString('ru'),message:redact(message)}].slice(-100)};
+async function backend(){return helper.status==='ready'?'WireGuard Desktop Helper':null}
+async function updateSnapshot(ids,force=false){
+ if(helper.status!=='ready')return;
+ if(!force&&Date.now()-helperSnapshot.updatedAt<1500)return;
+ if(snapshotPending)return snapshotPending;
+ snapshotPending=helperClient.request({op:'snapshot',ids}).then(snapshot=>{helperSnapshot=snapshot}).catch(error=>{helperSnapshot={profiles:{},updatedAt:0};helper={status:'error',message:'Системный помощник недоступен. Нажмите «Настроить доступ».'};log(error.message)}).finally(()=>{snapshotPending=null});return snapshotPending;
+}
+async function setupHelper(){
+ if(helperSetup)return helperSetup;
+ helperSetup=(async()=>{helper={status:'installing',message:'macOS запрашивает разрешение на установку системного помощника'};try{
+  if(!await helperClient.available())await helperClient.install(app.isPackaged?path.join(process.resourcesPath,'helper'):path.join(__dirname,'../build/helper'));
+  helper={status:'ready',message:''};helperSnapshot.updatedAt=0;log('Системный помощник готов. Повторные запросы пароля не нужны.');
+ }catch(error){helper={status:'required',message:'Для управления VPN установите системный помощник. Потребуется разрешение администратора.'};log(error.message)}finally{helperSetup=null}})();return helperSetup;
+}
+async function profiles(){ const files=await fs.readdir(dir);await updateSnapshot(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(f=>f.slice(0,-5))); return Promise.all(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(async file=>{const id=file.slice(0,-5);const meta=JSON.parse(await fs.readFile(path.join(dir,id+'.json'),'utf8'));const runtimeState=helperSnapshot.profiles[id]||await runtime.read(id);return {id,...meta,...parseConfig(await fs.readFile(path.join(dir,file),'utf8')),...runtimeState,stats:runtimeState.active?runtimeState.stats||null:null}}))}
+async function state(){const all=await profiles();return {profiles:all.map(p=>({...p,notes:routeNotes(p,all)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
+app.whenReady().then(async()=>{
+ nativeTheme.themeSource='system';
+ const applyAppearance=()=>{const color=nativeTheme.shouldUseDarkColors?'#101416':'#f5f8f6';for(const window of BrowserWindow.getAllWindows())window.setBackgroundColor(color)};
+ nativeTheme.on('updated',applyAppearance);
+ dir=path.join(app.getPath('userData'),'tunnels');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.chmod(dir,0o700);
+ runtime=new RuntimeStatus('/var/run/wireguard',path.join(app.getPath('userData'),'runtime-status.json'));await runtime.load();
+ controller=new TunnelController({list:profiles,log,execute:async(profile,action)=>{
+   if(helper.status!=='ready')throw Error('Сначала настройте системный помощник');
+   const config=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
+   try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
+   finally{helperSnapshot.updatedAt=0}
+ }});
+ const authorized=event=>{if(event.sender!==win?.webContents&&event.sender!==popover?.webContents)throw Error('Unknown sender')};
+ const mainOnly=event=>{if(event.sender!==win?.webContents)throw Error('Main window required')};
+ ipcMain.handle('state',async e=>{authorized(e);return state()});
+ ipcMain.handle('setup-helper',async e=>{authorized(e);await setupHelper();return state()});
+ ipcMain.handle('refresh-stats',async e=>{
+   authorized(e);if(statsBusy)throw Error('Статистика уже обновляется');statsBusy=true;
+   try{const ids=(await fs.readdir(dir)).filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(f=>f.slice(0,-5));await updateSnapshot(ids,true);return await state()}finally{statsBusy=false}
+ });
+ ipcMain.handle('import',async e=>{
+  mainOnly(e);if(importing)throw Error('Импорт уже открыт');importing=true;
+  try{
+   const result=await dialog.showOpenDialog(win,{properties:['openFile'],filters:[{name:'WireGuard',extensions:['conf']}]});if(result.canceled)return state();
+   const file=result.filePaths[0];if((await fs.stat(file)).size>65536)throw Error('Конфиг слишком большой');const text=await fs.readFile(file,'utf8');const summary=parseConfig(text);const name=path.basename(file,'.conf').trim();
+   const existing=await Promise.all((await fs.readdir(dir)).filter(f=>/^wg[a-f0-9]{10}\.json$/.test(f)).map(async f=>({name:JSON.parse(await fs.readFile(path.join(dir,f),'utf8')).name,config:await fs.readFile(path.join(dir,f.replace(/\.json$/,'.conf')),'utf8')})));
+   assertUniqueProfile(name,text,existing);
+   const id='wg'+crypto.randomBytes(5).toString('hex');const target=path.join(dir,id+'.conf');await fs.writeFile(target,text,{mode:0o600,flag:'wx'});
+   try{await fs.writeFile(path.join(dir,id+'.json'),JSON.stringify({name,...summary}),{mode:0o600,flag:'wx'})}catch(error){await fs.rm(target,{force:true});throw error}
+   helperSnapshot.updatedAt=0;log('Конфигурация импортирована');return state();
+  }finally{importing=false}
+ });
+ ipcMain.handle('set-active',async(e,id,active)=>{authorized(e);if(editing.has(id))throw Error('Сохранение конфигурации');try{await controller.setActive(id,active)}catch{throw Error('Не удалось изменить состояние туннеля. Проверьте журнал событий.')}return state()});
+ ipcMain.handle('remove',async(e,id)=>{mainOnly(e);if(editing.has(id))throw Error('Сохранение конфигурации');if(controller.pending.has(id))throw Error('Дождитесь завершения операции');const profile=(await profiles()).find(p=>p.id===id);if(!profile||profile.active||profile.statusUnknown)throw Error('Сначала отключите туннель');const answer=await dialog.showMessageBox(win,{type:'question',message:'Удалить «'+profile.name+'»?',detail:'Исходный файл останется на месте.',buttons:['Отмена','Удалить'],cancelId:0,defaultId:0});if(answer.response===1){if(controller.pending.has(id)||(await profiles()).find(p=>p.id===id)?.active||(await profiles()).find(p=>p.id===id)?.statusUnknown)throw Error('Сначала отключите туннель');if(helper.status==='ready')await helperClient.request({op:'forget',id});await fs.unlink(path.join(dir,id+'.conf'));await fs.unlink(path.join(dir,id+'.json'));log('Туннель удалён')}return state()});
+
+ ipcMain.handle('read-config',async(e,id)=>{mainOnly(e);if(!(await profiles()).some(p=>p.id===id))throw Error('Туннель не найден');const text=await fs.readFile(path.join(dir,id+'.conf'),'utf8');return {text:maskConfig(text),revision:revision(text)}});
+ ipcMain.handle('save-config',async(e,id,draft,expected)=>{
+   mainOnly(e);if(typeof draft!=='string'||Buffer.byteLength(draft)>65536)throw Error('Конфиг слишком большой');
+   if(editing.has(id)||controller.pending.has(id))throw Error('Дождитесь завершения операции');editing.add(id);
+   try {
+     const profile=(await profiles()).find(p=>p.id===id);if(!profile)throw Error('Туннель не найден');if(profile.active||profile.statusUnknown)throw Error('Сначала отключите этот туннель, затем сохраните изменения');
+     const target=path.join(dir,id+'.conf');const original=await fs.readFile(target,'utf8');if(revision(original)!==expected)throw Error('Конфиг изменился. Закройте редактор и откройте заново');
+     const text=restoreConfig(draft,original);const summary=parseConfig(text);
+     const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
+     try{await fs.writeFile(temp,text,{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}
+     await fs.writeFile(path.join(dir,id+'.json'),JSON.stringify({name:profile.name,...summary}),{mode:0o600});log(profile.name+': конфигурация сохранена');return state();
+   }finally{editing.delete(id)}
+ });
+ ipcMain.handle('open-main',e=>{authorized(e);popover.hide();win.show();win.focus()});
+ function secureWindow(window){window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',e=>e.preventDefault())}
+ function createWindow(){
+   win=new BrowserWindow({width:1040,height:720,minWidth:840,minHeight:600,titleBarStyle:'hiddenInset',backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+   secureWindow(win);win.loadFile(path.join(__dirname,'../dist/index.html'));
+   win.on('close',event=>{if(!quitting){event.preventDefault();win.hide()}});
+ }
+ function trayIcon(){
+   const icon=nativeImage.createFromPath(path.join(__dirname,'../dist/wireguard.png')).resize({width:22,height:22});icon.setTemplateImage(true);return icon;
+ }
+ createWindow();
+ popover=new BrowserWindow({width:360,height:440,show:false,frame:false,resizable:false,skipTaskbar:true,alwaysOnTop:true,backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+ applyAppearance();secureWindow(popover);popover.loadFile(path.join(__dirname,'../dist/index.html'),{hash:'tray'});popover.on('blur',()=>popover.hide());
+ tray=new Tray(trayIcon());tray.setToolTip('WireGuard Desktop');
+ const togglePopover=()=>{if(popover.isVisible()){popover.hide();return}const anchor=tray.getBounds();const area=screen.getDisplayNearestPoint({x:anchor.x,y:anchor.y}).workArea;popover.setPosition(Math.max(area.x,Math.min(anchor.x+Math.round(anchor.width/2)-180,area.x+area.width-360)),Math.max(area.y,anchor.y+anchor.height+5));popover.show();popover.focus()};
+ tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:'Открыть WireGuard Desktop',click:()=>{win.show();win.focus()}},{label:'Завершить приложение (туннели останутся активны)',click:()=>app.quit()}])));
+ const updateTray=async()=>{try{const all=await profiles();const count=all.filter(p=>p.active).length;tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · Активно: '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · Ошибка чтения состояния')}};
+ void setupHelper().then(updateTray);const timer=setInterval(updateTray,2500);app.on('before-quit',()=>{quitting=true;clearInterval(timer)});
+ Menu.setApplicationMenu(Menu.buildFromTemplate([{label:app.name,submenu:[{role:'about'},{label:'Быстрые подключения',accelerator:'CommandOrControl+Shift+T',click:togglePopover},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]}]));app.on('activate',()=>{win.show();win.focus()});
+});

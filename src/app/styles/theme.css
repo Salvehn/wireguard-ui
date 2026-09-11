@@ -1,0 +1,342 @@
+/* Shared interaction states and automatic macOS appearance. */
+.shield {
+  padding: 7px;
+}
+button {
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+.primary:hover:not(:disabled) {
+  background: #d5f5df;
+  box-shadow: 0 2px 10px #bdeacb18;
+}
+.primary:active:not(:disabled) {
+  background: #9dcead;
+  box-shadow: none;
+}
+.icon:hover:not(:disabled) {
+  background: #2a3b30;
+  border-color: #658570;
+}
+.import:hover:not(:disabled) {
+  background: #25372c;
+  border-color: #87ac93;
+  color: #d6f1df;
+}
+.tunnel:hover:not(:disabled) {
+  background: #202e26;
+  border-color: #3d5947;
+}
+.tunnel.selected:hover {
+  background: #314539;
+  border-color: #63856d;
+}
+.active-chips button:hover {
+  background: #3b5142;
+  border-color: #80a88b;
+}
+.tray-switch:hover:not(:disabled) {
+  background: #637c6d;
+}
+.tray-switch.on:hover:not(:disabled) {
+  background: #b6dfc1;
+}
+.error button:hover {
+  color: #fff;
+  background: #80523b;
+  border-radius: 4px;
+}
+:root {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background: #f5f8f6;
+    color: #20372a;
+  }
+  aside {
+    background: #eaf1ec;
+    border-color: #d1dfd5;
+  }
+  .brand strong {
+    color: #20372a;
+  }
+  .brand span,
+  .section-label,
+  .sidebar-foot {
+    color: #65796b;
+  }
+  .brand,
+  .shield,
+  .empty-icon,
+  .tray-heading {
+    color: #386446;
+  }
+  main,
+  header {
+    background: #f5f8f6;
+  }
+  header {
+    color: #647a6b;
+  }
+  .local {
+    border-color: #ccdbd0;
+    color: #506e5a;
+  }
+  p,
+  .tunnel small,
+  .hint,
+  .stats-empty {
+    color: #607969;
+  }
+  .tunnel {
+    color: #294e36;
+  }
+  .tunnel.selected {
+    background: #d6e8dc;
+    border-color: #b0cbb9;
+  }
+  .tunnel:hover:not(:disabled) {
+    background: #e0ece4;
+    border-color: #b7cebf;
+  }
+  .tunnel.selected:hover {
+    background: #c8e0d1;
+    border-color: #8ab39a;
+  }
+  i {
+    background: #94a99b;
+  }
+  i.online {
+    background: #3c8455;
+    box-shadow: 0 0 7px #4b9b6325;
+  }
+  .import {
+    border-color: #adc6b5;
+    color: #365b43;
+  }
+  .import:hover:not(:disabled) {
+    background: #d9eade;
+    border-color: #709d80;
+    color: #244c33;
+  }
+  .icon {
+    border-color: #bdcfc3;
+    color: #36533f;
+  }
+  .icon:hover:not(:disabled) {
+    background: #dcebe1;
+    border-color: #82ab91;
+  }
+  .primary {
+    background: #386c4a;
+    color: #fff;
+  }
+  .primary:hover:not(:disabled) {
+    background: #285b3a;
+    box-shadow: 0 2px 10px #285b3a20;
+  }
+  .primary:active:not(:disabled) {
+    background: #1f4b2f;
+    box-shadow: none;
+  }
+  .connection,
+  .active-summary {
+    background: #e7f1ea;
+    border-color: #c3d8ca;
+  }
+  .connected {
+    border-color: #6c9a7a;
+  }
+  .shield {
+    background: #cfe2d5;
+  }
+  .eyebrow {
+    color: #597c63;
+  }
+  .card {
+    background: #fafdfb;
+    border-color: #d4e1d8;
+  }
+  .card span {
+    color: #66846f;
+  }
+  .card div {
+    color: #294532;
+  }
+  .active-chips button {
+    background: #d4e6d9;
+    border-color: #abc9b5;
+    color: #34553f;
+  }
+  .active-chips button:hover {
+    background: #bedbc8;
+    border-color: #7ba98b;
+  }
+  .active-chips > span {
+    color: #6d8374;
+  }
+  .route-notes {
+    background: #f4efdf;
+    border-color: #b99246;
+  }
+  .route-notes p {
+    color: #80662f;
+  }
+  .journal,
+  .stats-panel {
+    background: #fbfdfb;
+    border-color: #cdded2;
+  }
+  .journal-head {
+    background: #e7f0e9;
+    color: #53715d;
+  }
+  .log p,
+  time {
+    color: #6e8a76;
+  }
+  pre {
+    color: #35563f;
+  }
+  .peer {
+    border-color: #d4e1d8;
+  }
+  dt {
+    color: #6c8373;
+  }
+  dd {
+    color: #365641;
+  }
+  .fresh {
+    color: #357248;
+  }
+  .stale {
+    color: #947138;
+  }
+  footer,
+  .tray-footer small {
+    color: #738979;
+  }
+  .empty-icon {
+    background: #deece3;
+    border-color: #b2cebc;
+  }
+  .empty small {
+    color: #718b7a;
+  }
+  .error {
+    background: #fff0e6;
+    border-color: #dfb89a;
+    color: #895233;
+  }
+  .error button:hover {
+    background: #ebcfbb;
+    color: #703b20;
+  }
+  .modal-backdrop {
+    background: #223d2b55;
+  }
+  .config-editor {
+    background: #f3f8f4;
+    border-color: #b3cfbe;
+    box-shadow: 0 24px 80px #213c2b30;
+  }
+  .editor-note {
+    color: #63816d;
+  }
+  .config-editor textarea {
+    background: #fff;
+    color: #294c35;
+    border-color: #bfd4c6;
+  }
+  .config-editor textarea:focus {
+    border-color: #548c68;
+  }
+  .tray-panel {
+    background: #f5f8f6;
+    border-color: #bfd3c6;
+  }
+  .tray-heading {
+    border-color: #cfddd3;
+  }
+  .tray-heading strong {
+    color: #284731;
+  }
+  .tray-tunnel {
+    border-color: #d6e2da;
+  }
+  .tray-tunnel small {
+    color: #6b8373;
+  }
+  .tray-switch {
+    background: #bfcdc4;
+  }
+  .tray-switch span {
+    background: #fff;
+  }
+  .tray-switch.on {
+    background: #50885f;
+  }
+  .tray-switch.on span {
+    background: #fff;
+  }
+  .tray-switch:hover:not(:disabled) {
+    background: #a3bcae;
+  }
+  .tray-switch.on:hover:not(:disabled) {
+    background: #326b43;
+  }
+  .wg-icon {
+    filter: brightness(0) saturate(100%) invert(32%) sepia(18%) saturate(1051%)
+      hue-rotate(89deg) brightness(91%) contrast(89%);
+  }
+  main,
+  nav,
+  .log {
+    color-scheme: light;
+  }
+  main::-webkit-scrollbar-thumb,
+  nav::-webkit-scrollbar-thumb,
+  .log::-webkit-scrollbar-thumb,
+  .config-editor textarea::-webkit-scrollbar-thumb,
+  .tray-list::-webkit-scrollbar-thumb {
+    background-color: #abc3b2;
+  }
+  main::-webkit-scrollbar-thumb:hover,
+  nav::-webkit-scrollbar-thumb:hover,
+  .log::-webkit-scrollbar-thumb:hover,
+  .config-editor textarea::-webkit-scrollbar-thumb:hover,
+  .tray-list::-webkit-scrollbar-thumb:hover {
+    background-color: #749c81;
+  }
+}
+.helper-notice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #536b5b;
+  background: #23322a;
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+.helper-notice > div {
+  flex: 1;
+}
+.helper-notice p {
+  font-size: 11px;
+  margin-top: 6px;
+}
+@media (prefers-color-scheme: light) {
+  .helper-notice {
+    background: #e2eee6;
+    border-color: #b3cebd;
+  }
+}

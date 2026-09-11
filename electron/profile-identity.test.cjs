@@ -1,0 +1,4 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {assertUniqueProfile,normalizeName}=require('./profile-identity.cjs');
+test('duplicate names are rejected case-insensitively including trimmed and Unicode forms',()=>{assert.throws(()=>assertUniqueProfile(' OFFICE ', 'different', [{name:'office',config:'original'}]),/уже существует/);assert.equal(normalizeName('Café'),normalizeName('Cafe\u0301'))});
+test('same config under another name is rejected despite formatting/comments',()=>{assert.throws(()=>assertUniqueProfile('copy','[Interface]\nAddress = 10.0.0.1/32 # note',[{name:'original',config:'[Interface]\nAddress=10.0.0.1/32\n'}]),/уже импортирован/)});
+test('different named configurations remain independent',()=>{assert.doesNotThrow(()=>assertUniqueProfile('office','Address=10.0.0.1/32',[{name:'home',config:'Address=10.2.0.1/32'}]))});

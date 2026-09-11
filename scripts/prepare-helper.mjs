@@ -1,0 +1,25 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+const base=path.resolve('build/helper');await fs.mkdir(path.join(base,'bin'),{recursive:true});await fs.mkdir(path.join(base,'licenses'),{recursive:true});
+const node=process.env.WG_NODE_RUNTIME||(process.env.NVM_BIN?path.join(process.env.NVM_BIN,'node'):process.execPath);
+const prefix=process.arch==='arm64'?'/opt/homebrew':'/usr/local';
+const sources={node,bash:prefix+'/bin/bash',wg:prefix+'/bin/wg','wg-quick':prefix+'/bin/wg-quick','wireguard-go':prefix+'/bin/wireguard-go'};
+for(const [name,source] of Object.entries(sources)){
+ const actual=await fs.realpath(source);
+ if(name!=='wg-quick'){
+  const dependencies=execFileSync('/usr/bin/otool',['-L',actual],{encoding:'utf8'}).split('\n').slice(1).map(line=>line.trim().split(' ')[0]).filter(Boolean);
+  if(dependencies.some(file=>!file.startsWith('/usr/lib/')&&!file.startsWith('/System/Library/')))throw Error(`${name} has non-system libraries; bundle those before distribution`);
+ }
+ await fs.copyFile(actual,path.join(base,'bin',name));await fs.chmod(path.join(base,'bin',name),0o755);
+}
+for(const name of ['server.cjs','core.cjs'])await fs.copyFile('helper/'+name,path.join(base,name));
+await fs.copyFile('electron/config.cjs',path.join(base,'config.cjs'));
+const licenses={Node:path.resolve(path.dirname(node),'../LICENSE'),WireGuardTools:prefix+'/opt/wireguard-tools/COPYING',WireGuardGo:prefix+'/opt/wireguard-go/LICENSE'};
+for(const [name,file] of Object.entries(licenses))await fs.copyFile(file,path.join(base,'licenses',name+'.txt'));
+// Bash source distribution license is shipped verbatim with the runtime.
+const bashRoot=path.resolve(await fs.realpath(prefix+'/bin/bash'),'../..');
+for(const candidate of [path.join(bashRoot,'COPYING'),prefix+'/opt/bash/COPYING']){try{await fs.copyFile(candidate,path.join(base,'licenses/Bash.txt'));break}catch{}}
+if(!await fs.access(path.join(base,'licenses/Bash.txt')).then(()=>true,()=>false))throw Error('Bash license missing');
+await fs.writeFile(path.join(base,'licenses/SOURCES.txt'),'Node.js: https://nodejs.org/\nBash: https://ftp.gnu.org/gnu/bash/ (bundled version: 5.2.15)\nWireGuard tools: https://git.zx2c4.com/wireguard-tools/ (1.0.20210914)\nWireGuard Go: https://git.zx2c4.com/wireguard-go/ (0.0.20230223)\n');
+console.log('Standalone WireGuard helper prepared with root-owned runtime and backend binaries.');

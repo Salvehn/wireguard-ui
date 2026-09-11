@@ -1,0 +1,2 @@
+const {contextBridge,ipcRenderer}=require('electron');
+contextBridge.exposeInMainWorld('wireguard',{setupHelper:()=>ipcRenderer.invoke('setup-helper'),readConfig:id=>ipcRenderer.invoke('read-config',id),saveConfig:(id,text,revision)=>ipcRenderer.invoke('save-config',id,text,revision),openMain:()=>ipcRenderer.invoke('open-main'),refreshStats:()=>ipcRenderer.invoke('refresh-stats'),state:()=>ipcRenderer.invoke('state'),import:()=>ipcRenderer.invoke('import'),setActive:(id,active)=>ipcRenderer.invoke('set-active',id,active),remove:id=>ipcRenderer.invoke('remove',id)});
