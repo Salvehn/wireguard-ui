@@ -1,7 +1,7 @@
 import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
 import { BrandIcon } from "@/shared/ui/brand-icon";
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import {
   Plus,
   Power,
@@ -9,6 +9,7 @@ import {
   Trash2,
   Activity,
   Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { tunnelApi, useTunnels, type Profile } from "@/entities/tunnel";
 import { ConfigEditor } from "@/features/edit-tunnel";
@@ -20,6 +21,8 @@ import { Card } from "@/shared/ui/card";
 export function WorkspacePage() {
   const { data, setData, ready, error, setError } = useTunnels();
   const { pending, perform } = useTunnelActions(setData, setError);
+  const connectionsPopover = useRef<HTMLDivElement>(null);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [selected, select] = useState("");
   const [editor, setEditor] = useState<Profile | null>(null);
   const profile =
@@ -44,9 +47,47 @@ export function WorkspacePage() {
       <main>
         <header>
           <span>РАБОЧЕЕ ПРОСТРАНСТВО / VPN</span>
-          <span className="local">
+          <button
+            className="local connections-trigger"
+            popoverTarget="active-connections"
+            aria-expanded={connectionsOpen}
+            aria-controls="active-connections"
+          >
+            <i className={activeProfiles.length ? "online" : ""} />
             Активно: {activeProfiles.length} / {data.profiles.length}
-          </span>
+            <ChevronDown size={13} />
+          </button>
+          <div
+            id="active-connections"
+            className="connections-popover"
+            popover="auto"
+            ref={connectionsPopover}
+            onToggle={(event) => setConnectionsOpen(event.newState === "open")}
+            role="region"
+            aria-label="Активные соединения"
+          >
+            <strong>Активные соединения</strong>
+            {activeProfiles.length ? (
+              <div className="connections-list">
+                {activeProfiles.map((p) => (
+                  <button
+                    key={p.id}
+                    aria-current={p.id === profile?.id ? "true" : undefined}
+                    onClick={() => {
+                      connectionsPopover.current?.hidePopover();
+                      if (p.id !== profile?.id) animate(() => select(p.id));
+                    }}
+                  >
+                    <i className="online" />
+                    <span>{p.name}</span>
+                    <ArrowUpRight size={14} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p>Нет активных туннелей</p>
+            )}
+          </div>
         </header>
         {error && (
           <div className="error" role="alert">
@@ -82,29 +123,6 @@ export function WorkspacePage() {
               )}
             </button>
           </div>
-        )}
-        {data.profiles.length > 0 && (
-          <section className="active-summary">
-            <div>
-              <strong>Параллельные соединения</strong>
-              <p>Каждый туннель подключается и отключается отдельно.</p>
-            </div>
-            <div className="active-chips">
-              {activeProfiles.length ? (
-                activeProfiles.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => animate(() => select(p.id))}
-                  >
-                    <i className="online" />
-                    {p.name}
-                  </button>
-                ))
-              ) : (
-                <span>Нет активных туннелей</span>
-              )}
-            </div>
-          </section>
         )}
         {profile ? (
           <Fragment key={profile.id}>

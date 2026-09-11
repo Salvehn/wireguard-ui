@@ -747,3 +747,61 @@ nav::-webkit-scrollbar-corner,
 .stats-heading > .icon { min-width: 176px; justify-content: center; }
 .stats-heading p, .traffic, .peer dd { font-variant-numeric: tabular-nums; }
 .stats-panel { min-height: 352px; overflow-anchor: none; }
+
+.connections-trigger {
+  anchor-name: --connections-trigger;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: inherit;
+  -webkit-app-region: no-drag;
+  font-variant-numeric: tabular-nums;
+}
+.connections-trigger[aria-expanded="true"] { background: #9ccfaa20; }
+.connections-trigger > svg { transition: transform 160ms ease; }
+.connections-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.connections-popover {
+  position: fixed;
+  position-anchor: --connections-trigger;
+  inset: auto;
+  top: anchor(bottom);
+  right: anchor(right);
+  margin: 9px 0 0;
+  width: min(300px, calc(100vw - 32px));
+  max-height: min(360px, 65vh);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid #344138;
+  border-radius: 12px;
+  background: #19211c;
+  color: #c3d1c8;
+  box-shadow: 0 12px 32px #0003;
+  letter-spacing: 0;
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+}
+.connections-popover:popover-open { animation: fade-in 140ms ease-out; }
+.connections-popover > strong { display: block; margin-bottom: 12px; }
+.connections-popover > p { color: #82988a; margin: 0; }
+.connections-list { display: grid; gap: 4px; }
+.connections-list button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.connections-list button:hover, .connections-list button[aria-current] { background: #9ccfaa20; }
+.connections-list button span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
+.connections-list button > svg { flex-shrink: 0; }
+.connections-trigger:focus-visible, .connections-list button:focus-visible { outline: 2px solid #749980; outline-offset: 3px; }
+@media (prefers-color-scheme: light) {
+  .connections-popover { background: #fff; color: #263c2d; border-color: #d6e2d9; }
+  .connections-popover > p { color: #607468; }
+}
