@@ -60,7 +60,8 @@ html[data-theme="light"] body {
   color: #20372a;
 }
 html[data-theme="light"] aside {
-  background: #eaf1ec;
+  background:
+    radial-gradient(circle at 0 0, #62ad7d2e 0, transparent 220px), #eaf1ec;
   border-color: #d1dfd5;
 }
 html[data-theme="light"] .brand strong {

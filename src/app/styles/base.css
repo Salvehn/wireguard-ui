@@ -41,7 +41,8 @@ body,
 aside {
   width: 246px;
   flex-shrink: 0;
-  background: #151a1c;
+  background:
+    radial-gradient(circle at 0 0, #68c48920 0, transparent 220px), #151a1c;
   border-right: 1px solid #293031;
   padding: 60px 16px 20px;
   display: flex;
