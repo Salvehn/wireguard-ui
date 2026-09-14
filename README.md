@@ -8,6 +8,6 @@ A WireGuard client for macOS on Apple Silicon. Import `.conf` profiles, run mult
 
 Includes English and Russian, light and dark themes, and in-app updates with download progress and restart.
 
-![WireGuard Desktop with a fictional demo connection](docs/images/desktop-demo.png)
+![WireGuard Desktop with a fictional demo connection](docs/images/desktop-macos-window.png)
 
 *Demo data; no real VPN connection or private keys are shown.*
