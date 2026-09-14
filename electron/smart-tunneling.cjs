@@ -107,7 +107,7 @@ async function applySmartTunneling(
   config,
   input = defaults(),
   lookup,
-  { allowDynamic = false, additionalEntries = [] } = {},
+  { allowDynamic = false, additionalEntries = [], deferredDomains = [] } = {},
 ) {
   const settings = validateSettings(input);
   if (settings.mode === "off") return config;
@@ -116,7 +116,11 @@ async function applySmartTunneling(
     throw Error("Маски требуют обновления системного помощника");
   const rules = await resolveEntries(
     [
-      ...settings.entries.filter((entry) => !entry.startsWith("*.")),
+      ...settings.entries.filter(
+        (entry) =>
+          !entry.startsWith("*.") &&
+          !(allowDynamic && deferredDomains.includes(entry)),
+      ),
       ...additionalEntries,
     ],
     lookup,

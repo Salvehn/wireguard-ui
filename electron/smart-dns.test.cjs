@@ -263,3 +263,170 @@ test("DNS route changes run inside the shared application routing coordination h
   await f.proxies[0].observe("api.example.com", ["203.0.113.7"]);
   assert.deepEqual(sequence, ["pause-apps", "resume-apps"]);
 });
+
+const privateId = "wg1111111111";
+const privateText =
+  "# Company DNS\nnameserver 192.168.160.14\ndomain pamir.int\n";
+async function privateFixture(t) {
+  const f = await fixture(t);
+  const target = path.join(f.resolverDirectory, "pamir.int");
+  await fs.writeFile(target, privateText, { mode: 0o640 });
+  await fs.chmod(target, 0o640);
+  const run = f.manager.run;
+  f.manager.run = async (file, args) =>
+    file === "/usr/sbin/scutil"
+      ? {
+          stdout:
+            "DNS configuration\nresolver #1\n domain : pamir.int\n nameserver[0] : 192.168.160.14\n port : 53\n",
+        }
+      : run(file, args);
+  const { question, errorResponse } = require("../helper/dns-wire.cjs");
+  const queries = [];
+  f.manager.forwardQuery = async (query, servers) => {
+    queries.push({ name: question(query).name, servers });
+    const response = errorResponse(query, 0);
+    if (question(query).type !== 1) return response;
+    response.writeUInt16BE(1, 6);
+    return Buffer.concat([
+      response,
+      Buffer.from([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 10, 20, 0, 7]),
+    ]);
+  };
+  const session = await f.manager.prepare(privateId, original, {
+    mode: "include",
+    entries: ["pamir.int", "*.pamir.int"],
+  });
+  t.after(async () => {
+    if (f.manager.sessions.has(privateId)) {
+      await f.manager.deactivate(privateId);
+      await f.manager.finish(privateId);
+    }
+  });
+  return { ...f, target, privateSession: session, queries };
+}
+test("existing private resolver supplies upstream DNS and is restored byte-for-byte on disconnect", async (t) => {
+  const f = await privateFixture(t);
+  assert.equal(await fs.readFile(f.target, "utf8"), privateText);
+  assert.deepEqual(f.queries, []);
+  assert.deepEqual(f.privateSession.serversFor("host.pamir.int"), [
+    "192.168.160.14",
+  ]);
+  assert.deepEqual(f.privateSession.serversFor("pamir.int.example.org"), [
+    "192.0.2.53",
+  ]);
+  await f.manager.activate(f.privateSession, "utun9");
+  const marker = JSON.parse(
+    await fs.readFile(f.manager.marker(privateId), "utf8"),
+  );
+  assert.equal(marker.replacements[0].original, privateText);
+  assert.equal(marker.files.length, 0);
+  assert.equal(
+    await fs.readFile(f.target, "utf8"),
+    marker.replacements[0].installed,
+  );
+  assert.equal((await fs.stat(f.target)).mode & 0o777, 0o640);
+  const { makeQuery } = require("../helper/dns-wire.cjs");
+  await f.proxies.at(-1).forwardQuery(makeQuery("host.pamir.int", 1));
+  assert.deepEqual(f.queries.at(-1), {
+    name: "host.pamir.int",
+    servers: ["192.168.160.14"],
+  });
+  await f.manager.deactivate(privateId);
+  await f.manager.finish(privateId);
+  assert.equal(await fs.readFile(f.target, "utf8"), privateText);
+  assert.equal((await fs.stat(f.target)).mode & 0o777, 0o640);
+});
+test("an apex without DNS records does not block subdomains and later apex answers are learned", async (t) => {
+  const f = await privateFixture(t);
+  const { makeQuery, errorResponse } = require("../helper/dns-wire.cjs");
+  f.manager.forwardQuery = async (query) => errorResponse(query, 3);
+  await f.manager.activate(f.privateSession, "utun9");
+  const proxy = f.proxies.at(-1);
+  assert.equal(
+    (await proxy.forwardQuery(makeQuery("pamir.int", 1)))[3] & 15,
+    3,
+  );
+  assert.equal(f.privateSession.learned.size, 0);
+  assert.equal(proxy.matches("pamir.int"), true);
+  assert.equal(proxy.matches("host.pamir.int"), true);
+  assert.equal(proxy.matches("pamir.int.example.org"), false);
+  await proxy.observe("host.pamir.int", ["10.20.0.7"]);
+  await proxy.observe("pamir.int", ["10.20.0.8"]);
+  assert.equal(f.routes.get("10.20.0.7/32"), "utun9");
+  assert.equal(f.routes.get("10.20.0.8/32"), "utun9");
+});
+test("resolver backups restore after a helper restart", async (t) => {
+  const f = await privateFixture(t);
+  await f.manager.activate(f.privateSession, "utun9");
+  const recovered = new SmartDns(f.options);
+  await recovered.recover();
+  assert.equal(await fs.readFile(f.target, "utf8"), privateText);
+  assert.equal(
+    await fs.access(recovered.marker(privateId)).then(
+      () => true,
+      () => false,
+    ),
+    false,
+  );
+  assert.match(recovered.errors.get(privateId), /перезапущен/);
+  for (const proxy of f.proxies) await proxy.close();
+  f.manager.sessions.clear();
+});
+test("write-ahead backup recovers an interruption just after resolver replacement", async (t) => {
+  const f = await privateFixture(t);
+  const write = f.manager.resolverWrite.bind(f.manager);
+  f.manager.resolverWrite = async (...args) => {
+    await write(...args);
+    throw Error("Interrupted after rename");
+  };
+  await assert.rejects(
+    f.manager.activate(f.privateSession, "utun9"),
+    /Interrupted/,
+  );
+  assert.match(await fs.readFile(f.target, "utf8"), /managed resolver/);
+  f.manager.resolverWrite = write;
+  await f.manager.deactivate(privateId);
+  await f.manager.finish(privateId);
+  assert.equal(await fs.readFile(f.target, "utf8"), privateText);
+});
+test("external edits to a redirected resolver are never overwritten", async (t) => {
+  const f = await privateFixture(t);
+  await f.manager.activate(f.privateSession, "utun9");
+  const changed = "nameserver 192.168.160.15\ndomain pamir.int\n";
+  await fs.writeFile(f.target, changed);
+  await assert.rejects(f.manager.deactivate(privateId), /DNS-файл изменён/);
+  assert.equal(await fs.readFile(f.target, "utf8"), changed);
+  assert.equal(f.proxies.at(-1).closed, true);
+  assert.equal(
+    JSON.parse(await fs.readFile(f.manager.marker(privateId), "utf8"))
+      .replacements[0].original,
+    privateText,
+  );
+});
+test("another system resolver for the same domain still blocks takeover", async (t) => {
+  const f = await privateFixture(t);
+  f.manager.run = async () => ({
+    stdout:
+      "resolver #1\n domain : pamir.int\n nameserver[0] : 192.168.160.15\n",
+  });
+  await assert.rejects(
+    f.manager.prepare(privateId, original, {
+      mode: "include",
+      entries: ["*.pamir.int"],
+    }),
+    /пересекаются/,
+  );
+  assert.equal(await fs.readFile(f.target, "utf8"), privateText);
+});
+test("changes between prepare and activate leave the DNS file untouched", async (t) => {
+  const f = await privateFixture(t);
+  const changed = "nameserver 192.168.160.15\ndomain pamir.int\n";
+  await fs.writeFile(f.target, changed);
+  await assert.rejects(
+    f.manager.activate(f.privateSession, "utun9"),
+    /изменились/,
+  );
+  await f.manager.deactivate(privateId);
+  await f.manager.finish(privateId);
+  assert.equal(await fs.readFile(f.target, "utf8"), changed);
+});

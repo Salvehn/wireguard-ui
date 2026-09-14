@@ -20,6 +20,8 @@ Open **Smart tunneling** on a disconnected profile to choose what goes through t
 
 **Applications and multiple VPNs.** Choose `.app` bundles with the native macOS picker. Application rules and address rules are alternative modes within one profile; different profiles can use different modes at the same time. Specific work subnets of ordinary VPNs retain priority. When application rules overlap, the most recently connected profile wins. Excluded or unmatched traffic can use another active VPN; it is not necessarily sent directly. Disconnecting one profile preserves the others.
 
+For a wildcard with an existing ordinary `/etc/resolver` file for the same domain, the helper forwards queries to that file’s DNS servers and restores the original file when disconnected. Other overlapping resolver rules still block connection. Exact domains covered by a wildcard also learn addresses from DNS queries, so a missing apex record does not prevent connection.
+
 Address-list modes use system DNS. In application mode, system DNS follows ordinary routes, shared system services may not be identified as part of an app, and WireGuard peer statistics are unavailable. Restart selected applications after connecting. Connection or domain-route changes briefly restart the shared application engine and may interrupt its traffic. Updating the system helper may require an administrator password.
 
 Wildcard and application routing are experimental: automated checks pass, but live VPN integration has not yet been verified.
