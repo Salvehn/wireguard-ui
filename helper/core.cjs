@@ -9,7 +9,7 @@ const { hasWildcard, validateSettings } = require("./smart-tunneling.cjs");
 const { AppTunnels } = require("./app-tunnels.cjs");
 const { validateApps, enabled: appsEnabled } = require("./app-tunneling.cjs");
 const exec = promisify(execFile);
-const VERSION = 7;
+const VERSION = 8;
 const validId = (id) => typeof id === "string" && /^wg[a-f0-9]{10}$/.test(id);
 function validateRequest(request) {
   if (!request || typeof request !== "object" || Array.isArray(request))

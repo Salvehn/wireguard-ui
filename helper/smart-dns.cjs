@@ -374,35 +374,39 @@ class SmartDns {
         cache.set(
           name,
           (async () => {
-            const groups = await Promise.all(
-              [1, 28].map(async (type) => {
-                const query = makeQuery(name, type);
-                let timer;
-                try {
-                  return answers(
-                    await Promise.race([
-                      this.forwardQuery(query, serversFor(name)),
-                      new Promise((_, reject) => {
-                        timer = setTimeout(
-                          () => reject(Error("DNS timeout")),
-                          4000,
-                        );
-                      }),
-                    ]),
-                    query,
-                  );
-                } catch {
-                  return [];
-                } finally {
-                  clearTimeout(timer);
-                }
-              }),
-            );
-            const addresses = [...new Set(groups.flat())].map((address) => ({
-              address,
-            }));
-            if (!addresses.length) throw Error("DNS resolution failed");
-            return addresses;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              if (attempt)
+                await new Promise((resolve) => setTimeout(resolve, 250));
+              const groups = await Promise.all(
+                [1, 28].map(async (type) => {
+                  const query = makeQuery(name, type);
+                  let timer;
+                  try {
+                    return answers(
+                      await Promise.race([
+                        this.forwardQuery(query, serversFor(name)),
+                        new Promise((_, reject) => {
+                          timer = setTimeout(
+                            () => reject(Error("DNS timeout")),
+                            4000,
+                          );
+                        }),
+                      ]),
+                      query,
+                    );
+                  } catch {
+                    return [];
+                  } finally {
+                    clearTimeout(timer);
+                  }
+                }),
+              );
+              const addresses = [...new Set(groups.flat())].map((address) => ({
+                address,
+              }));
+              if (addresses.length) return addresses;
+            }
+            throw Error("DNS resolution failed after 3 attempts");
           })(),
         );
       return cache.get(name);
@@ -411,6 +415,7 @@ class SmartDns {
       allowDynamic: true,
       deferredDomains,
       additionalEntries: supportingEntries,
+      dnsTimeoutMs: 15000,
     });
     const session = {
       id,

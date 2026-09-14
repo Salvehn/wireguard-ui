@@ -74,7 +74,7 @@ function subtract(a, b) {
     { ...a, prefix: a.prefix + 1, start: a.start + half },
   ].flatMap((part) => subtract(part, b));
 }
-async function resolveEntries(entries, lookup = dns.lookup) {
+async function resolveEntries(entries, lookup = dns.lookup, timeoutMs = 5000) {
   const groups = await Promise.all(
     entries.map(async (entry) => {
       try {
@@ -85,7 +85,7 @@ async function resolveEntries(entries, lookup = dns.lookup) {
         const addresses = await Promise.race([
           lookup(entry, { all: true, verbatim: true }),
           new Promise((_, reject) => {
-            timer = setTimeout(() => reject(Error("DNS timeout")), 5000);
+            timer = setTimeout(() => reject(Error("DNS timeout")), timeoutMs);
           }),
         ]);
         if (!addresses.length || addresses.length > 256)
@@ -107,7 +107,12 @@ async function applySmartTunneling(
   config,
   input = defaults(),
   lookup,
-  { allowDynamic = false, additionalEntries = [], deferredDomains = [] } = {},
+  {
+    allowDynamic = false,
+    additionalEntries = [],
+    deferredDomains = [],
+    dnsTimeoutMs = 5000,
+  } = {},
 ) {
   const settings = validateSettings(input);
   if (settings.mode === "off") return config;
@@ -124,6 +129,7 @@ async function applySmartTunneling(
       ...additionalEntries,
     ],
     lookup,
+    dnsTimeoutMs,
   );
   // Subtracting a default route disables wg-quick's automatic endpoint bypass.
   // Pin endpoints for this connection and exclude their host routes explicitly.
@@ -134,7 +140,11 @@ async function applySmartTunneling(
       /^(\s*Endpoint\s*=\s*)(?:\[([^\]]+)\]|([^:#\s]+)):(\d+)\s*(?:#.*)?$/,
     );
     if (!match) continue;
-    const addresses = await resolveEntries([match[2] || match[3]], lookup);
+    const addresses = await resolveEntries(
+      [match[2] || match[3]],
+      lookup,
+      dnsTimeoutMs,
+    );
     const host = cidr(addresses[0]).split("/")[0];
     endpointRules.push(addresses[0]);
     endpointLines.set(

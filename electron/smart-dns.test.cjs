@@ -171,6 +171,52 @@ test("a stalled AAAA lookup does not discard a usable IPv4 endpoint", async (t) 
   );
   assert.match(session.compiled, /Endpoint=198\.51\.100\.1:51820/);
 });
+test("endpoint DNS retries timed-out attempts within one connection beyond the old five-second limit", async (t) => {
+  const f = await fixture(t);
+  const { question, errorResponse } = require("../helper/dns-wire.cjs");
+  const attempts = new Map();
+  f.manager.forwardQuery = async (query) => {
+    const type = question(query).type;
+    const count = (attempts.get(type) || 0) + 1;
+    attempts.set(type, count);
+    if (count < 3) return new Promise(() => {});
+    const response = errorResponse(query, 0);
+    if (type !== 1) return response;
+    response.writeUInt16BE(1, 6);
+    return Buffer.concat([
+      response,
+      Buffer.from([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 198, 51, 100, 1]),
+    ]);
+  };
+  const session = await f.manager.prepare(
+    "wg0987654321",
+    original.replace("198.51.100.1:51820", "vpn.example.net:51820"),
+    { mode: "include", entries: ["*.private.test"] },
+  );
+  assert.match(session.compiled, /Endpoint=198\.51\.100\.1:51820/);
+  assert.equal(attempts.get(1), 3);
+  assert.equal(attempts.get(28), 3);
+});
+test("persistent endpoint DNS failure stops after three attempts without preparing tunnel state", async (t) => {
+  const f = await fixture(t);
+  let queries = 0;
+  f.manager.forwardQuery = async () => {
+    queries++;
+    throw Error("DNS unavailable");
+  };
+  await assert.rejects(
+    f.manager.prepare(
+      "wg0987654321",
+      original.replace("198.51.100.1:51820", "vpn.example.net:51820"),
+      { mode: "include", entries: ["*.private.test"] },
+    ),
+    /vpn\.example\.net/,
+  );
+  assert.equal(queries, 6);
+  await assert.rejects(fs.access(f.manager.marker("wg0987654321")), {
+    code: "ENOENT",
+  });
+});
 test("route table parser keeps exact masks even when more-specific routes exist", () => {
   assert.deepEqual(
     parseRouteTable(
