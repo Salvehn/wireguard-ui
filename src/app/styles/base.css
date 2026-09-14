@@ -12,10 +12,14 @@ body {
     sans-serif;
 }
 button {
+  -webkit-app-region: no-drag;
   font: inherit;
   cursor: pointer;
   color: inherit;
   transition: 0.15s;
+}
+button svg {
+  pointer-events: none;
 }
 button:disabled {
   opacity: 0.4;
@@ -1058,6 +1062,7 @@ html[data-theme="light"] .language-error {
   font-size: 11px;
 }
 .smart-dialog {
+  -webkit-app-region: no-drag;
   width: min(600px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: hidden;
