@@ -13,6 +13,7 @@ export function SmartTunneling({
   saved: (state: State) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const subdomainsCheckbox = useRef<HTMLInputElement>(null);
   const backdropPress = useRef(false);
   const [settings, setSettings] = useState<SmartTunnelingSettings>({
     mode: "off",
@@ -21,7 +22,6 @@ export function SmartTunneling({
   const [revision, setRevision] = useState("");
   const [initial, setInitial] = useState("");
   const [entry, setEntry] = useState("");
-  const [allSubdomains, setAllSubdomains] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -34,7 +34,7 @@ export function SmartTunneling({
     setRevision("");
     setError("");
     setEntry("");
-    setAllSubdomains(false);
+    resetSubdomains();
     setDiscard(false);
     window.wireguard
       .readSmartTunneling(profile.id)
@@ -63,7 +63,11 @@ export function SmartTunneling({
     dialog.current?.close();
     setOpen(false);
   }
+  function resetSubdomains() {
+    if (subdomainsCheckbox.current) subdomainsCheckbox.current.checked = false;
+  }
   function pendingEntries() {
+    const includeSubdomains = subdomainsCheckbox.current?.checked ?? false;
     return entry
       .split(/[\s,]+/)
       .filter(Boolean)
@@ -76,7 +80,9 @@ export function SmartTunneling({
           domain.includes(".") &&
           !/[\s/:*?#@\\%]/.test(domain) &&
           !/^[\d.]+$/.test(domain);
-        return allSubdomains && isDomain ? [domain, `*.${domain}`] : [value];
+        return includeSubdomains && isDomain
+          ? [domain, `*.${domain}`]
+          : [value];
       });
   }
   function mergedEntries() {
@@ -90,7 +96,7 @@ export function SmartTunneling({
     try {
       setSettings({ ...settings, entries: mergedEntries() });
       setEntry("");
-      setAllSubdomains(false);
+      resetSubdomains();
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -372,7 +378,7 @@ export function SmartTunneling({
                     maxLength={4096}
                     onChange={(event) => {
                       setEntry(event.target.value);
-                      if (!event.target.value.trim()) setAllSubdomains(false);
+                      if (!event.target.value.trim()) resetSubdomains();
                     }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
@@ -393,9 +399,9 @@ export function SmartTunneling({
                 <label className="smart-subdomains">
                   <input
                     type="checkbox"
-                    checked={allSubdomains}
+                    ref={subdomainsCheckbox}
+                    defaultChecked={false}
                     disabled={!entry.trim()}
-                    onChange={(event) => setAllSubdomains(event.target.checked)}
                   />
                   {t("Все поддомены")}
                 </label>
@@ -411,7 +417,7 @@ export function SmartTunneling({
                         !/^[\d.]+$/.test(value) &&
                         !settings.entries.includes(`*.${value}`) && (
                           <button
-                            className="icon"
+                            className="icon smart-subdomain-action"
                             disabled={settings.entries.length >= 64}
                             aria-label={t("Добавить поддомены {name}", {
                               name: value,
@@ -423,8 +429,8 @@ export function SmartTunneling({
                               })
                             }
                           >
-                            <Plus size={13} />
-                            {t("Поддомены")}
+                            <Plus size={16} />
+                            <span>{t("Поддомены")}</span>
                           </button>
                         )}
                       <button

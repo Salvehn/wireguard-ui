@@ -1166,6 +1166,18 @@ html[data-theme="light"] .language-error {
   height: 40px;
   padding: 0;
 }
+.smart-subdomain-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.smart-subdomain-action svg {
+  flex-shrink: 0;
+}
 .smart-subdomains {
   display: flex;
   align-items: center;
