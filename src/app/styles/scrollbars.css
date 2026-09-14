@@ -1,0 +1,51 @@
+/* One scrollbar style for every scrollable surface, including nested lists. */
+:root {
+  --scroll-thumb: #41564a;
+  --scroll-thumb-hover: #6b8e78;
+  --scroll-thumb-active: #a2c5ac;
+}
+html[data-theme="light"] {
+  --scroll-thumb: #abc3b2;
+  --scroll-thumb-hover: #749c81;
+  --scroll-thumb-active: #527c60;
+}
+* {
+  scrollbar-width: auto;
+}
+:where(
+  main,
+  nav,
+  .log,
+  .tray-list,
+  .config-editor textarea,
+  .tray-panel > .error,
+  .connections-popover,
+  .smart-dialog-body,
+  .smart-list
+) {
+  scrollbar-gutter: stable;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  margin: 2px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scroll-thumb-active);
+}

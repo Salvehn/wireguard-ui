@@ -1,57 +1,30 @@
-/* Fade only the content that continues beyond the current scroll position.
-   Scroll timelines stay inactive when all content fits, leaving an opaque mask. */
-@property --scroll-fade-top {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@property --scroll-fade-bottom {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-
-@supports (animation-timeline: scroll(self block)) {
-  :where(main, nav, .log, .tray-list) {
-    --scroll-fade-offset: 0px;
-    --scroll-mask-y: linear-gradient(
-      to bottom,
-      #000 0,
-      #000 var(--scroll-fade-offset),
-      transparent var(--scroll-fade-offset),
-      #000 calc(var(--scroll-fade-offset) + var(--scroll-fade-top)),
-      #000 calc(100% - var(--scroll-fade-bottom)),
-      transparent 100%
-    );
-    mask-image: var(--scroll-mask-y);
-    animation:
-      scroll-fade-top 1s linear both,
-      scroll-fade-bottom 1s linear both;
-    animation-timeline: scroll(self block), scroll(self block);
-    animation-range:
-      0px 24px,
-      calc(100% - 24px) 100%;
-  }
-
-  /* The workspace header stays readable while content scrolls underneath it. */
-  main {
-    --scroll-fade-offset: 77px;
-  }
+/* Shared vertical fades. Zero overflow leaves every pixel opaque. */
+:where(
+  main,
+  nav,
+  .log,
+  .tray-list,
+  .config-editor textarea,
+  .tray-panel > .error,
+  .connections-popover,
+  .smart-dialog-body,
+  .smart-list
+) {
+  --scroll-fade-offset: 0px;
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 var(--scroll-fade-offset),
+    transparent var(--scroll-fade-offset),
+    #000 calc(var(--scroll-fade-offset) + var(--scroll-fade-top)),
+    #000 calc(100% - var(--scroll-fade-bottom)),
+    transparent 100%
+  );
 }
 
-@keyframes scroll-fade-top {
-  from {
-    --scroll-fade-top: 0px;
-  }
-  to {
-    --scroll-fade-top: 24px;
-  }
-}
-@keyframes scroll-fade-bottom {
-  from {
-    --scroll-fade-bottom: 24px;
-  }
-  to {
-    --scroll-fade-bottom: 0px;
-  }
+/* Keep the workspace header readable above the scrolling content. */
+main {
+  --scroll-fade-offset: 77px;
 }
