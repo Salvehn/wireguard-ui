@@ -5,7 +5,7 @@ const {execFile}=require('node:child_process');
 const {promisify}=require('node:util');
 const {quote}=require('./config.cjs');
 const run=promisify(execFile);
-const VERSION=1;
+const VERSION=4;
 const socketPath=()=>`/var/run/wireguard-desktop-${process.getuid()}/helper.sock`;
 function request(command,timeout=130000){return new Promise((resolve,reject)=>{
  const socket=net.createConnection(socketPath());let result='';let settled=false;

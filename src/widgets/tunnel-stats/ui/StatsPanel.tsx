@@ -19,7 +19,9 @@ export function StatsPanel({
         <div>
           <strong>{t("Связь с peers")}</strong>
           <p>
-            {profile.interfaceName || t("Интерфейс не поднят")}
+            {profile.appRouting
+              ? t("Маршрутизация по приложениям")
+              : profile.interfaceName || t("Интерфейс не поднят")}
             {stats
               ? t(" · Обновлено ") +
                 new Date(stats.updatedAt).toLocaleTimeString(getLanguage())
@@ -28,7 +30,11 @@ export function StatsPanel({
         </div>
         <button
           className="icon"
-          disabled={(!profile.active && !profile.statusUnknown) || pending}
+          disabled={
+            profile.appRouting ||
+            (!profile.active && !profile.statusUnknown) ||
+            pending
+          }
           onClick={refresh}
         >
           <span style={{ width: 14, height: 14 }}>
@@ -39,11 +45,13 @@ export function StatsPanel({
       </div>
       {!stats ? (
         <p className="stats-empty">
-          {profile.active || profile.statusUnknown
-            ? t(
-                "Помощник получает handshake и трафик автоматически. Можно обновить данные сейчас.",
-              )
-            : t("Handshake и трафик доступны после подключения.")}
+          {profile.appRouting
+            ? t("Статистика WireGuard в режиме приложений недоступна.")
+            : profile.active || profile.statusUnknown
+              ? t(
+                  "Помощник получает handshake и трафик автоматически. Можно обновить данные сейчас.",
+                )
+              : t("Handshake и трафик доступны после подключения.")}
         </p>
       ) : (
         <>

@@ -3,6 +3,7 @@ import type { UpdateState } from "@/shared/lib/update";
 export type SmartTunnelingSettings = {
   mode: "off" | "include" | "exclude";
   entries: string[];
+  applications?: { mode: "off" | "include" | "exclude"; paths: string[] };
 };
 
 export type Peer = {
@@ -23,6 +24,8 @@ export type Profile = {
   endpoint: string;
   allowedIPs: string;
   peers: number;
+  smartError?: string;
+  appRouting?: boolean;
   smartTunneling?: SmartTunnelingSettings;
   active: boolean;
   statusUnknown: boolean;
@@ -77,6 +80,7 @@ declare global {
       downloadUpdate: () => Promise<UpdateState>;
       installUpdate: () => Promise<UpdateState>;
       onUpdateState: (listener: (state: UpdateState) => void) => () => void;
+      chooseApplications: () => Promise<string[]>;
       readSmartTunneling: (
         id: string,
       ) => Promise<{ settings: SmartTunnelingSettings; revision: string }>;

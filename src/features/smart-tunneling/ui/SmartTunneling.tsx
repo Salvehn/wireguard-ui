@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Globe2, Plus, X, Split } from "lucide-react";
+import { Globe2, Plus, X, Split, AppWindow } from "lucide-react";
 import type { Profile, State, SmartTunnelingSettings } from "@/entities/tunnel";
 import { t, message } from "@/shared/lib/i18n";
 
@@ -96,7 +96,26 @@ export function SmartTunneling({
       setSaving(false);
     }
   }
+  const apps = settings.applications || { mode: "off" as const, paths: [] };
+  const appsActive = apps.mode !== "off";
+  async function chooseApps() {
+    try {
+      const paths = [
+        ...new Set([
+          ...apps.paths,
+          ...(await window.wireguard.chooseApplications()),
+        ]),
+      ];
+      if (paths.length > 64) throw Error(t("Максимум 64 приложения"));
+      setSettings({ ...settings, applications: { ...apps, paths } });
+      setError("");
+    } catch (e) {
+      setError(message((e as Error).message));
+    }
+  }
   const mode = profile.smartTunneling?.mode || "off";
+  const profileApps = profile.smartTunneling?.applications;
+
   return (
     <>
       <button
@@ -110,19 +129,30 @@ export function SmartTunneling({
         <span>
           <strong>Smart tunneling</strong>
           <small>
-            {mode === "off"
-              ? t("Маршруты конфигурации")
-              : mode === "include"
-                ? t("Только адреса из списка")
-                : t("Кроме адресов из списка")}
+            {profileApps?.mode && profileApps.mode !== "off"
+              ? profileApps.mode === "include"
+                ? t("Только выбранные приложения")
+                : t("Кроме выбранных приложений")
+              : mode === "off"
+                ? t("Маршруты конфигурации")
+                : mode === "include"
+                  ? t("Только адреса из списка")
+                  : t("Кроме адресов из списка")}
           </small>
         </span>
         <span className="smart-count">
-          {mode === "off"
-            ? t("Настроить")
-            : `${profile.smartTunneling?.entries.length || 0} · ${t("Настроить")}`}
+          {profileApps?.mode && profileApps.mode !== "off"
+            ? `${profileApps.paths.length} · ${t("Настроить")}`
+            : mode === "off"
+              ? t("Настроить")
+              : `${profile.smartTunneling?.entries.length || 0} · ${t("Настроить")}`}
         </span>
       </button>
+      {profile.smartError && (
+        <div className="error" role="alert">
+          {message(profile.smartError)}
+        </div>
+      )}
       <dialog
         className="smart-dialog"
         ref={dialog}
@@ -157,14 +187,22 @@ export function SmartTunneling({
           {(["off", "exclude", "include"] as const).map((mode) => (
             <label
               key={mode}
-              className={settings.mode === mode ? "selected" : ""}
+              className={
+                !appsActive && settings.mode === mode ? "selected" : ""
+              }
             >
               <input
                 type="radio"
                 name="smart-mode"
                 value={mode}
-                checked={settings.mode === mode}
-                onChange={() => setSettings({ ...settings, mode })}
+                checked={!appsActive && settings.mode === mode}
+                onChange={() =>
+                  setSettings({
+                    ...settings,
+                    mode,
+                    applications: { ...apps, mode: "off" },
+                  })
+                }
               />
               <span>
                 {mode === "off"
@@ -176,75 +214,203 @@ export function SmartTunneling({
             </label>
           ))}
         </fieldset>
-        <p className="smart-description">
-          {t(
-            "Список сужает маршруты исходной конфигурации. Исключённый трафик может проходить через другое активное VPN-соединение.",
-          )}
-        </p>
         <fieldset
-          className="smart-addresses"
-          disabled={saving || !revision || locked || settings.mode === "off"}
+          className="smart-modes"
+          disabled={saving || !revision || locked}
         >
           <legend>
-            <Globe2 size={16} /> {t("Домены и IP-адреса")}{" "}
-            <span>{settings.entries.length}/64</span>
+            <AppWindow size={16} /> {t("Приложения")}
           </legend>
-          <div className="smart-add">
-            <input
-              aria-label={t("Домен, IP-адрес или CIDR")}
-              placeholder="example.com, 192.168.0.0/16"
-              value={entry}
-              maxLength={4096}
-              onChange={(event) => setEntry(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  add();
-                }
-              }}
-            />
-            <button
-              className="icon"
-              aria-label={t("Добавить адрес")}
-              onClick={add}
-              disabled={!entry.trim()}
+          {(["include", "exclude"] as const).map((mode) => (
+            <label key={mode} className={apps.mode === mode ? "selected" : ""}>
+              <input
+                type="radio"
+                name="smart-mode"
+                checked={apps.mode === mode}
+                onChange={() => {
+                  setEntry("");
+                  setSettings({
+                    ...settings,
+                    mode: "off",
+                    applications: { ...apps, mode },
+                  });
+                }}
+              />
+              <span>
+                {mode === "include"
+                  ? t("Только выбранные приложения")
+                  : t("Кроме выбранных приложений")}
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {appsActive && (
+          <>
+            <fieldset
+              className="smart-addresses"
+              disabled={saving || !revision || locked}
             >
-              <Plus size={18} />
-            </button>
-          </div>
-          <div className="smart-list">
-            {!settings.entries.length && (
-              <p>{t("Добавьте адреса для выбранного режима.")}</p>
-            )}
-            {settings.entries.map((value, index) => (
-              <div key={value}>
-                <code>{value}</code>
+              <legend>
+                {t("Выбранные приложения")} <span>{apps.paths.length}/64</span>
+              </legend>
+              <button className="icon" onClick={chooseApps}>
+                <Plus size={16} /> {t("Выбрать приложения…")}
+              </button>
+              <div className="smart-list">
+                {apps.paths.map((appPath) => (
+                  <div key={appPath}>
+                    <code title={appPath}>
+                      {appPath
+                        .split("/")
+                        .at(-1)
+                        ?.replace(/\.app$/, "")}
+                    </code>
+                    <button
+                      className="icon"
+                      aria-label={t("Удалить приложение {name}", {
+                        name: appPath,
+                      })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          applications: {
+                            ...apps,
+                            paths: apps.paths.filter((p) => p !== appPath),
+                          },
+                        })
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+            <p className="smart-description">
+              {t(
+                "Можно включать несколько соединений. Рабочие подсети обычных VPN сохраняют приоритет; для совпадающих правил приложений используется последнее подключённое соединение.",
+              )}
+            </p>
+            <p className="smart-description">
+              {t(
+                "Учитываются процессы внутри выбранного .app. Общие системные службы могут не определяться как часть приложения. После подключения перезапустите выбранные приложения.",
+              )}
+            </p>
+            <p className="smart-description">
+              {t(
+                "Системный DNS следует обычным маршрутам. При изменении соединений или доменных маршрутов возможен краткий перерыв в трафике приложений. Статистика WireGuard в этом режиме недоступна.",
+              )}
+            </p>
+          </>
+        )}
+        {!appsActive && (
+          <>
+            <p className="smart-description">
+              {t(
+                "Список сужает маршруты исходной конфигурации. Исключённый трафик может проходить через другое активное VPN-соединение.",
+              )}
+            </p>
+            <fieldset
+              className="smart-addresses"
+              disabled={
+                saving || !revision || locked || settings.mode === "off"
+              }
+            >
+              <legend>
+                <Globe2 size={16} /> {t("Домены и IP-адреса")}{" "}
+                <span>{settings.entries.length}/64</span>
+              </legend>
+              <div className="smart-add">
+                <input
+                  aria-label={t("Домен, IP-адрес или CIDR")}
+                  placeholder="example.com, *.example.com, 192.168.0.0/16"
+                  value={entry}
+                  maxLength={4096}
+                  onChange={(event) => setEntry(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      add();
+                    }
+                  }}
+                />
                 <button
                   className="icon"
-                  aria-label={t("Удалить адрес {address}", { address: value })}
-                  onClick={() =>
-                    setSettings({
-                      ...settings,
-                      entries: settings.entries.filter((_, i) => index !== i),
-                    })
-                  }
+                  aria-label={t("Добавить адрес")}
+                  onClick={add}
+                  disabled={!entry.trim()}
                 >
-                  <X size={14} />
+                  <Plus size={18} />
                 </button>
               </div>
-            ))}
-          </div>
-        </fieldset>
-        <p className="smart-description">
-          {t(
-            "Домены разрешаются в IP при подключении. Для обновления адресов переподключитесь; поддомены добавляйте отдельно. Сайты с общим IP будут следовать одному правилу.",
-          )}
-        </p>
-        <p className="smart-description">
-          {t(
-            "В режимах со списком используется системный DNS. Выбор отдельных приложений не поддерживается.",
-          )}
-        </p>
+              <div className="smart-list">
+                {!settings.entries.length && (
+                  <p>{t("Добавьте адреса для выбранного режима.")}</p>
+                )}
+                {settings.entries.map((value, index) => (
+                  <div key={value}>
+                    <code>{value}</code>
+                    {value.includes(".") &&
+                      !/[\s/:*]/.test(value) &&
+                      !/^[\d.]+$/.test(value) &&
+                      !settings.entries.includes(`*.${value}`) && (
+                        <button
+                          className="icon"
+                          disabled={settings.entries.length >= 64}
+                          aria-label={t("Добавить поддомены {name}", {
+                            name: value,
+                          })}
+                          onClick={() =>
+                            setSettings({
+                              ...settings,
+                              entries: [...settings.entries, `*.${value}`],
+                            })
+                          }
+                        >
+                          <Plus size={13} />
+                          {t("Поддомены")}
+                        </button>
+                      )}
+                    <button
+                      className="icon"
+                      aria-label={t("Удалить адрес {address}", {
+                        address: value,
+                      })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          entries: settings.entries.filter(
+                            (_, i) => index !== i,
+                          ),
+                        })
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+            <p className="smart-description">
+              {t(
+                "*.example.com охватывает поддомены любого уровня, но не сам example.com. Добавьте обе записи, чтобы включить домен целиком.",
+              )}
+            </p>
+            <p className="smart-description">
+              {t("В режимах со списком используется системный DNS.")}
+            </p>
+            <p className="smart-description">
+              {t(
+                "Маски применяются к системным DNS-запросам во время соединения. Полученные IP сохраняются до отключения; сайты с общим IP следуют одному правилу. Приложения с собственным DNS-over-HTTPS могут обходить эти правила.",
+              )}
+            </p>
+            <p className="smart-description">
+              {t(
+                "Для масок требуется обновлённый системный помощник. macOS может запросить пароль администратора при его установке.",
+              )}
+            </p>
+          </>
+        )}
         {locked && (
           <p className="editor-note">
             {t(

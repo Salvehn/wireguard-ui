@@ -1,7 +1,8 @@
 const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme,net} = require('electron');
 const fs=require('node:fs/promises'), fsSync=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {parseConfig,redact}=require('./config.cjs');
-const {defaults:smartDefaults,validateSettings,applySmartTunneling}=require('./smart-tunneling.cjs');
+const {defaults:smartDefaults,validateSettings,applySmartTunneling,hasWildcard}=require('./smart-tunneling.cjs');
+const {validateApps,compileApps,enabled:appsEnabled}=require('./app-tunneling.cjs');
 const {routeNotes,TunnelController}=require('./tunnels.cjs');
 
 const {maskConfig,restoreConfig,revision}=require('./editor.cjs');
@@ -46,8 +47,9 @@ app.whenReady().then(async()=>{
  controller=new TunnelController({list:profiles,log,execute:async(profile,action)=>{
    if(helper.status!=='ready')throw Error('Сначала настройте системный помощник');
    const original=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
-   const config=action==='up'?await applySmartTunneling(original,profile.smartTunneling||smartDefaults()):original;
-   try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
+   const settings=profile.smartTunneling||smartDefaults();const appRules=validateApps(action==='up'?settings.applications:undefined);const useApps=action==='up'&&appsEnabled(appRules);const dynamic=action==='up'&&hasWildcard(settings);
+   const config=action==='up'&&!dynamic&&!useApps?await applySmartTunneling(original,settings):original;
+   try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config,...(useApps?{applications:appRules}:dynamic?{smartTunneling:settings}:{})});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
    finally{helperSnapshot.updatedAt=0}
  }});
  const authorized=event=>{if(event.sender!==win?.webContents&&event.sender!==popover?.webContents)throw Error('Unknown sender')};
@@ -92,6 +94,13 @@ app.whenReady().then(async()=>{
  ipcMain.handle('remove',async(e,id)=>{mainOnly(e);if(editing.has(id))throw Error('Сохранение конфигурации');if(controller.pending.has(id))throw Error('Дождитесь завершения операции');const profile=(await profiles()).find(p=>p.id===id);if(!profile||profile.active||profile.statusUnknown)throw Error('Сначала отключите туннель');const answer=await dialog.showMessageBox(win,{type:'question',message:t('Удалить «{name}»?',{name:profile.name}),detail:t('Исходный файл останется на месте.'),buttons:[t('Отмена'),t('Удалить')],cancelId:0,defaultId:0});if(answer.response===1){if(controller.pending.has(id)||(await profiles()).find(p=>p.id===id)?.active||(await profiles()).find(p=>p.id===id)?.statusUnknown)throw Error('Сначала отключите туннель');if(helper.status==='ready')await helperClient.request({op:'forget',id});await fs.unlink(path.join(dir,id+'.conf'));await fs.unlink(path.join(dir,id+'.json'));log('Туннель удалён')}return state()});
 
  const smartRevision=(config,settings)=>revision(config+JSON.stringify(settings));
+ ipcMain.handle('choose-applications',async e=>{
+   mainOnly(e);const result=await dialog.showOpenDialog(win,{defaultPath:'/Applications',properties:['openFile','multiSelections'],filters:[{name:'Applications',extensions:['app']}]});
+   if(result.canceled)return [];
+   const paths=await Promise.all(result.filePaths.map(file=>fs.realpath(file)));
+   for(const file of paths){if(!(await fs.stat(path.join(file,'Contents/Info.plist'))).isFile())throw Error('Выберите приложение .app')}
+   return validateApps({mode:'off',paths}).paths;
+ });
  ipcMain.handle('read-smart-tunneling',async(e,id)=>{
    mainOnly(e);const profile=(await profiles()).find(p=>p.id===id);if(!profile)throw Error('Туннель не найден');
    const config=await fs.readFile(path.join(dir,id+'.conf'),'utf8');const settings=profile.smartTunneling||smartDefaults();
@@ -104,7 +113,10 @@ app.whenReady().then(async()=>{
      if(profile.active||profile.statusUnknown)throw Error('Сначала отключите этот туннель, затем сохраните изменения');
      const config=await fs.readFile(path.join(dir,id+'.conf'),'utf8');
      if(smartRevision(config,profile.smartTunneling||smartDefaults())!==expected)throw Error('Конфиг изменился. Закройте редактор и откройте заново');
-     const settings=validateSettings(input);await applySmartTunneling(config,settings);
+     const applications=validateApps(input?.applications);
+     if(appsEnabled(applications)&&input.mode!=='off')throw Error('Выберите правила по адресам или по приложениям');
+     const settings={...validateSettings(input),applications};
+     if(appsEnabled(applications))compileApps(config,applications);else await applySmartTunneling(config,settings,undefined,{allowDynamic:true});
      const target=path.join(dir,id+'.json');const meta=JSON.parse(await fs.readFile(target,'utf8'));
      const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
      try{await fs.writeFile(temp,JSON.stringify({...meta,smartTunneling:settings}),{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}

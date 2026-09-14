@@ -33,8 +33,12 @@ function normalizeEntry(value) {
   } catch {}
   if (/[\s/:?#@\\%]/.test(text))
     throw Error("Укажите домен, IP-адрес или CIDR без протокола и пути");
-  const domain = domainToASCII(text.replace(/\.$/, ""));
+  const wildcard = text.startsWith("*.");
+  const domain = domainToASCII(
+    (wildcard ? text.slice(2) : text).replace(/\.$/, ""),
+  );
   if (
+    domain.length > 253 ||
     !domain.includes(".") ||
     !domain
       .split(".")
@@ -42,7 +46,7 @@ function normalizeEntry(value) {
     /^[\d.]+$/.test(domain)
   )
     throw Error("Укажите домен, IP-адрес или CIDR без протокола и пути");
-  return domain;
+  return wildcard ? `*.${domain}` : domain;
 }
 function validateSettings(value) {
   if (
@@ -98,10 +102,24 @@ async function resolveEntries(entries, lookup = dns.lookup) {
     throw Error("Слишком много маршрутов Smart tunneling; сократите список");
   return ranges;
 }
-async function applySmartTunneling(config, input = defaults(), lookup) {
+async function applySmartTunneling(
+  config,
+  input = defaults(),
+  lookup,
+  { allowDynamic = false, additionalEntries = [] } = {},
+) {
   const settings = validateSettings(input);
   if (settings.mode === "off") return config;
-  const rules = await resolveEntries(settings.entries, lookup);
+  const dynamic = hasWildcard(settings);
+  if (dynamic && !allowDynamic)
+    throw Error("Маски требуют обновления системного помощника");
+  const rules = await resolveEntries(
+    [
+      ...settings.entries.filter((entry) => !entry.startsWith("*.")),
+      ...additionalEntries,
+    ],
+    lookup,
+  );
   // Subtracting a default route disables wg-quick's automatic endpoint bypass.
   // Pin endpoints for this connection and exclude their host routes explicitly.
   const endpointRules = [];
@@ -155,12 +173,30 @@ async function applySmartTunneling(config, input = defaults(), lookup) {
         : "";
     })
     .join("\n");
-  if (!count) throw Error("Список не оставляет маршрутов для этого соединения");
+  if (!count && !dynamic)
+    throw Error("Список не оставляет маршрутов для этого соединения");
   if (Buffer.byteLength(result) > 65536)
     throw Error("Слишком много маршрутов Smart tunneling; сократите список");
   return result;
 }
+function hasWildcard(settings) {
+  return (
+    (settings?.mode !== "off" &&
+      settings?.entries?.some(
+        (entry) => typeof entry === "string" && entry.startsWith("*."),
+      )) ||
+    false
+  );
+}
+function matchesPattern(pattern, domain) {
+  const name = domain.toLowerCase().replace(/\.$/, "");
+  return pattern.startsWith("*.")
+    ? name.endsWith("." + pattern.slice(2))
+    : name === pattern;
+}
 module.exports = {
+  hasWildcard,
+  matchesPattern,
   defaults,
   validateSettings,
   applySmartTunneling,

@@ -135,7 +135,7 @@ test("validation normalizes, deduplicates and rejects invalid input", () => {
   for (const entry of [
     "https://example.com",
     "example.com/path",
-    "*.example.com",
+    "foo.*.example.com",
     "1.2.3.999",
     "10.0.0.0/33",
     "x\nPostUp=x",
@@ -149,4 +149,49 @@ test("validation normalizes, deduplicates and rejects invalid input", () => {
   assert.throws(() =>
     validateSettings(settings("exclude", Array(65).fill("example.com"))),
   );
+});
+
+test("wildcards match every subdomain level but never apex or a suffix lookalike", () => {
+  const { matchesPattern, hasWildcard } = require("./smart-tunneling.cjs");
+  const normalized = validateSettings(settings("include", ["*.EXAMPLE.COM."]));
+  assert.deepEqual(normalized.entries, ["*.example.com"]);
+  assert.ok(hasWildcard(normalized));
+  for (const name of [
+    "api.example.com",
+    "one.two.example.com",
+    "API.EXAMPLE.COM.",
+  ])
+    assert.ok(matchesPattern("*.example.com", name));
+  for (const name of ["example.com", "evilexample.com", "example.com.evil.net"])
+    assert.ok(!matchesPattern("*.example.com", name));
+  for (const value of [
+    "*",
+    "*.com",
+    "foo.*.example.com",
+    "*example.com",
+    "*.127.0.0.1",
+  ])
+    assert.throws(() => validateSettings(settings("include", [value])));
+});
+test("wildcard-only include starts with no routes and learns addresses without widening base routes", async () => {
+  const rule = settings("include", ["*.example.com"]);
+  await assert.rejects(applySmartTunneling(config, rule), /помощника/);
+  const initial = await applySmartTunneling(config, rule, undefined, {
+    allowDynamic: true,
+  });
+  assert.equal(routes(initial).length, 0);
+  parseConfig(initial);
+  const learned = await applySmartTunneling(config, rule, undefined, {
+    allowDynamic: true,
+    additionalEntries: ["203.0.113.7/32", "2001:db8::7/128"],
+  });
+  assert.ok(contains(learned, "203.0.113.7"));
+  assert.ok(!contains(learned, "203.0.113.8"));
+  assert.ok(contains(learned, "2001:db8::7"));
+  const split = config.replace("0.0.0.0/0, ::/0", "10.0.0.0/8");
+  const out = await applySmartTunneling(split, rule, undefined, {
+    allowDynamic: true,
+    additionalEntries: ["203.0.113.7/32"],
+  });
+  assert.equal(routes(out).length, 0);
 });

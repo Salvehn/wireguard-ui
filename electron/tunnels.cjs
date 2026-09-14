@@ -2,14 +2,17 @@ const ipaddr = require('ipaddr.js');
 
 function routeNotes(profile, others) {
   const notes = [];
+  const appMode = p => ['include','exclude'].includes(p.smartTunneling?.applications?.mode);
+  const usesDNS = p => p.dns && !appMode(p) && (!p.smartTunneling || p.smartTunneling.mode==='off');
   const ranges = text => (text || '').split(',').map(s => s.trim()).filter(Boolean).flatMap(s => {
     try { return [ipaddr.parseCIDR(s)]; } catch { return []; }
   });
   for (const other of others.filter(p => p.active && p.id !== profile.id)) {
     const overlaps = ranges(profile.allowedIPs).some(([a, bitsA]) =>
       ranges(other.allowedIPs).some(([b, bitsB]) => a.kind() === b.kind() && a.match(b, Math.min(bitsA, bitsB))));
-    if (overlaps) notes.push(`Маршруты пересекаются с «${other.name}». Более узкая сеть имеет приоритет; одинаковые маршруты могут конфликтовать.`);
-    if (profile.dns && other.dns) notes.push(`DNS задан также в «${other.name}». macOS использует общие настройки DNS, результат зависит от порядка подключения.`);
+    if (overlaps && (appMode(profile)||appMode(other))) notes.push(`Совместная маршрутизация с «${other.name}»: рабочие подсети сохраняют приоритет, совпадающие правила приложений использует последнее подключённое соединение.`);
+    else if (overlaps) notes.push(`Маршруты пересекаются с «${other.name}». Более узкая сеть имеет приоритет; одинаковые маршруты могут конфликтовать.`);
+    if (usesDNS(profile) && usesDNS(other)) notes.push(`DNS задан также в «${other.name}». macOS использует общие настройки DNS, результат зависит от порядка подключения.`);
   }
   return notes;
 }
