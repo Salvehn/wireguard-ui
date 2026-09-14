@@ -1,6 +1,7 @@
 const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme,net} = require('electron');
 const fs=require('node:fs/promises'), fsSync=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {parseConfig,redact}=require('./config.cjs');
+const {defaults:smartDefaults,validateSettings,applySmartTunneling}=require('./smart-tunneling.cjs');
 const {routeNotes,TunnelController}=require('./tunnels.cjs');
 
 const {maskConfig,restoreConfig,revision}=require('./editor.cjs');
@@ -44,7 +45,8 @@ app.whenReady().then(async()=>{
  runtime=new RuntimeStatus('/var/run/wireguard',path.join(app.getPath('userData'),'runtime-status.json'));await runtime.load();
  controller=new TunnelController({list:profiles,log,execute:async(profile,action)=>{
    if(helper.status!=='ready')throw Error('Сначала настройте системный помощник');
-   const config=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
+   const original=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
+   const config=action==='up'?await applySmartTunneling(original,profile.smartTunneling||smartDefaults()):original;
    try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
    finally{helperSnapshot.updatedAt=0}
  }});
@@ -89,6 +91,26 @@ app.whenReady().then(async()=>{
  ipcMain.handle('set-active',async(e,id,active)=>{authorized(e);if(editing.has(id))throw Error('Сохранение конфигурации');try{await controller.setActive(id,active)}catch{throw Error('Не удалось изменить состояние туннеля. Проверьте журнал событий.')}return state()});
  ipcMain.handle('remove',async(e,id)=>{mainOnly(e);if(editing.has(id))throw Error('Сохранение конфигурации');if(controller.pending.has(id))throw Error('Дождитесь завершения операции');const profile=(await profiles()).find(p=>p.id===id);if(!profile||profile.active||profile.statusUnknown)throw Error('Сначала отключите туннель');const answer=await dialog.showMessageBox(win,{type:'question',message:t('Удалить «{name}»?',{name:profile.name}),detail:t('Исходный файл останется на месте.'),buttons:[t('Отмена'),t('Удалить')],cancelId:0,defaultId:0});if(answer.response===1){if(controller.pending.has(id)||(await profiles()).find(p=>p.id===id)?.active||(await profiles()).find(p=>p.id===id)?.statusUnknown)throw Error('Сначала отключите туннель');if(helper.status==='ready')await helperClient.request({op:'forget',id});await fs.unlink(path.join(dir,id+'.conf'));await fs.unlink(path.join(dir,id+'.json'));log('Туннель удалён')}return state()});
 
+ const smartRevision=(config,settings)=>revision(config+JSON.stringify(settings));
+ ipcMain.handle('read-smart-tunneling',async(e,id)=>{
+   mainOnly(e);const profile=(await profiles()).find(p=>p.id===id);if(!profile)throw Error('Туннель не найден');
+   const config=await fs.readFile(path.join(dir,id+'.conf'),'utf8');const settings=profile.smartTunneling||smartDefaults();
+   return {settings,revision:smartRevision(config,settings)};
+ });
+ ipcMain.handle('save-smart-tunneling',async(e,id,input,expected)=>{
+   mainOnly(e);if(editing.has(id)||controller.pending.has(id))throw Error('Дождитесь завершения операции');editing.add(id);
+   try{
+     const profile=(await profiles()).find(p=>p.id===id);if(!profile)throw Error('Туннель не найден');
+     if(profile.active||profile.statusUnknown)throw Error('Сначала отключите этот туннель, затем сохраните изменения');
+     const config=await fs.readFile(path.join(dir,id+'.conf'),'utf8');
+     if(smartRevision(config,profile.smartTunneling||smartDefaults())!==expected)throw Error('Конфиг изменился. Закройте редактор и откройте заново');
+     const settings=validateSettings(input);await applySmartTunneling(config,settings);
+     const target=path.join(dir,id+'.json');const meta=JSON.parse(await fs.readFile(target,'utf8'));
+     const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
+     try{await fs.writeFile(temp,JSON.stringify({...meta,smartTunneling:settings}),{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}
+     return state();
+   }finally{editing.delete(id)}
+ });
  ipcMain.handle('read-config',async(e,id)=>{mainOnly(e);if(!(await profiles()).some(p=>p.id===id))throw Error('Туннель не найден');const text=await fs.readFile(path.join(dir,id+'.conf'),'utf8');return {text:maskConfig(text),revision:revision(text)}});
  ipcMain.handle('save-config',async(e,id,draft,expected)=>{
    mainOnly(e);if(typeof draft!=='string'||Buffer.byteLength(draft)>65536)throw Error('Конфиг слишком большой');
@@ -99,7 +121,7 @@ app.whenReady().then(async()=>{
      const text=restoreConfig(draft,original);const summary=parseConfig(text);
      const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
      try{await fs.writeFile(temp,text,{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}
-     await fs.writeFile(path.join(dir,id+'.json'),JSON.stringify({name:profile.name,...summary}),{mode:0o600});log(profile.name+': конфигурация сохранена');return state();
+     await fs.writeFile(path.join(dir,id+'.json'),JSON.stringify({name:profile.name,...summary,smartTunneling:profile.smartTunneling||smartDefaults()}),{mode:0o600});log(profile.name+': конфигурация сохранена');return state();
    }finally{editing.delete(id)}
  });
  ipcMain.handle('open-main',e=>{authorized(e);popover.hide();win.show();win.focus()});

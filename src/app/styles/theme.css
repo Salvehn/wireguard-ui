@@ -374,3 +374,29 @@ html[data-theme="light"] .helper-notice {
   background: #e2eee6;
   border-color: #b3cebd;
 }
+
+html[data-theme="light"] .smart-summary,
+html[data-theme="light"] .smart-dialog {
+  background: #f5f8f6;
+  color: #20372a;
+  border-color: #c6d8cb;
+}
+html[data-theme="light"] .smart-summary small,
+html[data-theme="light"] .smart-count,
+html[data-theme="light"] .smart-description,
+html[data-theme="light"] .smart-list p,
+html[data-theme="light"] .smart-addresses legend span {
+  color: #60796a;
+}
+html[data-theme="light"] .smart-modes label,
+html[data-theme="light"] .smart-list > div {
+  border-color: #c6d8cb;
+}
+html[data-theme="light"] .smart-modes label.selected {
+  background: #e0eee4;
+  border-color: #80a58d;
+}
+html[data-theme="light"] .smart-add input {
+  background: #fff;
+  border-color: #b6cdbd;
+}

@@ -13,6 +13,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { tunnelApi, useTunnels, type Profile } from "@/entities/tunnel";
+import { SmartTunneling } from "@/features/smart-tunneling";
 import { ConfigEditor } from "@/features/edit-tunnel";
 import { useTunnelActions } from "@/features/manage-tunnels";
 import { TunnelNavigation } from "@/widgets/tunnel-navigation";
@@ -252,6 +253,11 @@ export function WorkspacePage() {
                 ))}
               </div>
             )}
+            <SmartTunneling
+              profile={profile}
+              pending={!!operation}
+              saved={setData}
+            />
             <div className="details">
               <Card label={t("АДРЕС ТУННЕЛЯ")} value={profile.address} />
               <Card label="DNS" value={profile.dns} />
