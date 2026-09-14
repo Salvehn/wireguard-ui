@@ -1,7 +1,7 @@
 const {app,BrowserWindow,ipcMain,dialog,Menu,Tray,nativeImage,screen,nativeTheme,net} = require('electron');
 const fs=require('node:fs/promises'), fsSync=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {parseConfig,redact}=require('./config.cjs');
-const {defaults:smartDefaults,validateSettings,applySmartTunneling,hasWildcard}=require('./smart-tunneling.cjs');
+const {defaults:smartDefaults,validateSettingsForSave,applySmartTunneling,hasWildcard}=require('./smart-tunneling.cjs');
 const {validateApps,compileApps,enabled:appsEnabled}=require('./app-tunneling.cjs');
 const {routeNotes,TunnelController}=require('./tunnels.cjs');
 
@@ -115,8 +115,8 @@ app.whenReady().then(async()=>{
      if(smartRevision(config,profile.smartTunneling||smartDefaults())!==expected)throw Error('Конфиг изменился. Закройте редактор и откройте заново');
      const applications=validateApps(input?.applications);
      if(appsEnabled(applications)&&input.mode!=='off')throw Error('Выберите правила по адресам или по приложениям');
-     const settings={...validateSettings(input),applications};
-     if(appsEnabled(applications))compileApps(config,applications);else await applySmartTunneling(config,settings,undefined,{allowDynamic:true});
+     const settings={...validateSettingsForSave(config,input),applications};
+     if(appsEnabled(applications))compileApps(config,applications);
      const target=path.join(dir,id+'.json');const meta=JSON.parse(await fs.readFile(target,'utf8'));
      const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
      try{await fs.writeFile(temp,JSON.stringify({...meta,smartTunneling:settings}),{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}

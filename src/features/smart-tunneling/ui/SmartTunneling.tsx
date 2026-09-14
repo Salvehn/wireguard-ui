@@ -13,6 +13,7 @@ export function SmartTunneling({
   saved: (state: State) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const backdropPress = useRef(false);
   const [settings, setSettings] = useState<SmartTunnelingSettings>({
     mode: "off",
     entries: [],
@@ -89,6 +90,7 @@ export function SmartTunneling({
     try {
       setSettings({ ...settings, entries: mergedEntries() });
       setEntry("");
+      setAllSubdomains(false);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -132,6 +134,16 @@ export function SmartTunneling({
   }
   const mode = profile.smartTunneling?.mode || "off";
   const profileApps = profile.smartTunneling?.applications;
+  function outside(event: React.MouseEvent<HTMLDialogElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return (
+      event.target === event.currentTarget &&
+      (event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom)
+    );
+  }
 
   return (
     <>
@@ -173,6 +185,16 @@ export function SmartTunneling({
       <dialog
         className="smart-dialog"
         ref={dialog}
+        onPointerDown={(event) => {
+          backdropPress.current = outside(event);
+        }}
+        onPointerCancel={() => {
+          backdropPress.current = false;
+        }}
+        onClick={(event) => {
+          if (backdropPress.current && outside(event)) close();
+          backdropPress.current = false;
+        }}
         onCancel={(event) => {
           event.preventDefault();
           close();
@@ -348,7 +370,10 @@ export function SmartTunneling({
                     placeholder="example.com, *.example.com, 192.168.0.0/16"
                     value={entry}
                     maxLength={4096}
-                    onChange={(event) => setEntry(event.target.value)}
+                    onChange={(event) => {
+                      setEntry(event.target.value);
+                      if (!event.target.value.trim()) setAllSubdomains(false);
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -369,6 +394,7 @@ export function SmartTunneling({
                   <input
                     type="checkbox"
                     checked={allSubdomains}
+                    disabled={!entry.trim()}
                     onChange={(event) => setAllSubdomains(event.target.checked)}
                   />
                   {t("Все поддомены")}
@@ -448,12 +474,12 @@ export function SmartTunneling({
               )}
             </p>
           )}
-          {error && (
-            <div className="error" role="alert">
-              {message(error)}
-            </div>
-          )}
         </div>
+        {error && (
+          <div className="error smart-dialog-error" role="alert">
+            {message(error)}
+          </div>
+        )}
         <div className="editor-actions">
           {discard ? (
             <>

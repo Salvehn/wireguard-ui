@@ -3,11 +3,22 @@ const assert = require("node:assert/strict");
 const {
   applySmartTunneling,
   validateSettings,
+  validateSettingsForSave,
   network,
 } = require("./smart-tunneling.cjs");
 const { parseConfig } = require("./config.cjs");
 const config = `[Interface]\nPrivateKey = ${"A".repeat(43)}=\nAddress = 10.8.0.2/32\nDNS = 10.8.0.1\n[Peer]\nPublicKey = ${"B".repeat(43)}=\nEndpoint = 198.51.100.1:51820\nAllowedIPs = 0.0.0.0/0, ::/0\n`;
 const settings = (mode, entries) => ({ mode, entries });
+test("saving private domains validates offline; resolving is deferred until connection", async (t) => {
+  const dns = require("node:dns/promises");
+  t.mock.method(dns, "lookup", () => { throw Error("DNS must not run while saving"); });
+  const input = settings("exclude", ["pamir.int", "*.pamir.int"]);
+  assert.deepEqual(validateSettingsForSave(config, input), input);
+  assert.equal(dns.lookup.mock.callCount(), 0);
+  assert.throws(() => validateSettingsForSave(config, settings("include", ["https://pamir.int/path"])), /без протокола/);
+  assert.throws(() => validateSettingsForSave("invalid config", input));
+  await assert.rejects(applySmartTunneling(config, input, async () => { throw Error("offline"); }, {allowDynamic:true}), /Не удалось разрешить домен/);
+});
 const routes = (text) =>
   text
     .split("\n")

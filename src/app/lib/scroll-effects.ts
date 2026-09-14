@@ -1,5 +1,5 @@
 const surfaces =
-  "main, nav, .log, .tray-list, .config-editor textarea, .tray-panel > .error, .connections-popover, .smart-dialog-body, .smart-list";
+  "main, nav, .log, .tray-list, .config-editor textarea, .tray-panel > .error, .connections-popover, .smart-dialog-body, .smart-dialog-error, .smart-list";
 
 // Measure actual overflow so fades also reset when a list shrinks or a dialog
 // opens. CSS scroll timelines can retain their last value after overflow ends.

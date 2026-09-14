@@ -1,6 +1,7 @@
 const ipaddr = require("ipaddr.js");
 const { domainToASCII } = require("node:url");
 const dns = require("node:dns/promises");
+const { parseConfig } = require("./config.cjs");
 
 const defaults = () => ({ mode: "off", entries: [] });
 function network(value) {
@@ -188,6 +189,12 @@ function hasWildcard(settings) {
     false
   );
 }
+// Saving is an offline operation. DNS and route expansion belong to connection
+// startup, when private domains may become resolvable through another VPN.
+function validateSettingsForSave(config, input) {
+  parseConfig(config);
+  return validateSettings(input);
+}
 function matchesPattern(pattern, domain) {
   const name = domain.toLowerCase().replace(/\.$/, "");
   return pattern.startsWith("*.")
@@ -199,6 +206,7 @@ module.exports = {
   matchesPattern,
   defaults,
   validateSettings,
+  validateSettingsForSave,
   applySmartTunneling,
   network,
   subtract,

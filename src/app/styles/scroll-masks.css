@@ -8,6 +8,7 @@
   .tray-panel > .error,
   .connections-popover,
   .smart-dialog-body,
+  .smart-dialog-error,
   .smart-list
 ) {
   --scroll-fade-offset: 0px;

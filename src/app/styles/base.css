@@ -1098,6 +1098,13 @@ html[data-theme="light"] .language-error {
   margin: 0;
   padding: 16px 24px;
 }
+.smart-dialog-error {
+  flex: none;
+  margin: 12px 24px 0;
+  max-height: 96px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
 .smart-description {
   color: #9bad9f;
   font-size: 12px;
