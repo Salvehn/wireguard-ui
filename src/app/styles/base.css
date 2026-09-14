@@ -1116,8 +1116,8 @@ html[data-theme="light"] .language-error {
 .smart-dialog {
   width: min(600px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
-  overflow: auto;
-  padding: 24px;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid #405449;
   border-radius: 16px;
   background: #18211d;
@@ -1126,6 +1126,30 @@ html[data-theme="light"] .language-error {
 .smart-dialog::backdrop {
   background: #050b08a8;
   backdrop-filter: blur(5px);
+}
+.smart-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.smart-dialog > .editor-heading {
+  flex: none;
+  padding: 24px 24px 12px;
+}
+.smart-dialog-body {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #779b8266 transparent;
+  margin: 0 8px;
+  padding: 0 16px;
+}
+.smart-dialog > .editor-actions {
+  flex: none;
+  margin: 0;
+  padding: 16px 24px;
 }
 .smart-description {
   color: #9bad9f;
@@ -1142,6 +1166,9 @@ html[data-theme="light"] .language-error {
 }
 .smart-modes legend,
 .smart-addresses legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
   font-size: 12px;
   font-weight: 600;
@@ -1163,9 +1190,9 @@ html[data-theme="light"] .language-error {
 .smart-modes input {
   accent-color: #87be99;
 }
+.smart-modes legend svg,
 .smart-addresses legend svg {
-  vertical-align: middle;
-  margin-right: 5px;
+  flex: none;
 }
 .smart-addresses legend span {
   margin-left: 8px;
