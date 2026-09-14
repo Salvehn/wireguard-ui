@@ -254,5 +254,6 @@
   "Не удалось восстановить правила приложений после ошибки": "Could not restore application rules after an error",
   "Не удалось обновить совместные маршруты приложений": "Could not update shared application routes",
   "Совместная маршрутизация с «{name}»: рабочие подсети сохраняют приоритет, совпадающие правила приложений использует последнее подключённое соединение.": "Shared routing with “{name}”: work subnets retain priority; overlapping app rules use the most recently connected profile.",
-  "Не удалось определить процесс движка приложений": "Could not identify the application routing engine process"
+  "Не удалось определить процесс движка приложений": "Could not identify the application routing engine process",
+  "Все поддомены": "All subdomains"
 }

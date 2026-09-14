@@ -20,6 +20,7 @@ export function SmartTunneling({
   const [revision, setRevision] = useState("");
   const [initial, setInitial] = useState("");
   const [entry, setEntry] = useState("");
+  const [allSubdomains, setAllSubdomains] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -32,6 +33,7 @@ export function SmartTunneling({
     setRevision("");
     setError("");
     setEntry("");
+    setAllSubdomains(false);
     setDiscard(false);
     window.wireguard
       .readSmartTunneling(profile.id)
@@ -60,28 +62,43 @@ export function SmartTunneling({
     dialog.current?.close();
     setOpen(false);
   }
-  function add() {
-    const values = entry.split(/[\s,]+/).filter(Boolean);
-    if (!values.length) return;
+  function pendingEntries() {
+    return entry
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .flatMap((value) => {
+        const domain = value
+          .toLowerCase()
+          .replace(/^\*\./, "")
+          .replace(/\.$/, "");
+        const isDomain =
+          domain.includes(".") &&
+          !/[\s/:*?#@\\%]/.test(domain) &&
+          !/^[\d.]+$/.test(domain);
+        return allSubdomains && isDomain ? [domain, `*.${domain}`] : [value];
+      });
+  }
+  function mergedEntries() {
+    const values = pendingEntries();
     const entries = [...new Set([...settings.entries, ...values])];
-    if (entries.length > 64) {
-      setError(t("Максимум 64 адреса"));
-      return;
+    if (entries.length > 64) throw Error(t("Максимум 64 адреса"));
+    return entries;
+  }
+  function add() {
+    if (!entry.trim()) return;
+    try {
+      setSettings({ ...settings, entries: mergedEntries() });
+      setEntry("");
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
     }
-    setSettings({ ...settings, entries });
-    setEntry("");
-    setError("");
   }
   async function save() {
     setSaving(true);
     setError("");
     try {
-      const entries = [
-        ...new Set([
-          ...settings.entries,
-          ...entry.split(/[\s,]+/).filter(Boolean),
-        ]),
-      ];
+      const entries = mergedEntries();
       saved(
         await window.wireguard.saveSmartTunneling(
           profile.id,
@@ -340,7 +357,7 @@ export function SmartTunneling({
                     }}
                   />
                   <button
-                    className="icon"
+                    className="icon smart-entry-action"
                     aria-label={t("Добавить адрес")}
                     onClick={add}
                     disabled={!entry.trim()}
@@ -348,6 +365,14 @@ export function SmartTunneling({
                     <Plus size={18} />
                   </button>
                 </div>
+                <label className="smart-subdomains">
+                  <input
+                    type="checkbox"
+                    checked={allSubdomains}
+                    onChange={(event) => setAllSubdomains(event.target.checked)}
+                  />
+                  {t("Все поддомены")}
+                </label>
                 <div className="smart-list">
                   {!settings.entries.length && (
                     <p>{t("Добавьте адреса для выбранного режима.")}</p>
@@ -377,7 +402,7 @@ export function SmartTunneling({
                           </button>
                         )}
                       <button
-                        className="icon"
+                        className="icon smart-entry-action"
                         aria-label={t("Удалить адрес {address}", {
                           address: value,
                         })}
@@ -390,7 +415,7 @@ export function SmartTunneling({
                           })
                         }
                       >
-                        <X size={14} />
+                        <X size={18} />
                       </button>
                     </div>
                   ))}

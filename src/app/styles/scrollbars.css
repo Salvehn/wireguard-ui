@@ -1,5 +1,6 @@
 /* One scrollbar style for every scrollable surface, including nested lists. */
 :root {
+  --scrollbar-size: 9px;
   --scroll-thumb: #41564a;
   --scroll-thumb-hover: #6b8e78;
   --scroll-thumb-active: #a2c5ac;
@@ -26,8 +27,8 @@ html[data-theme="light"] {
   scrollbar-gutter: stable;
 }
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-corner {
