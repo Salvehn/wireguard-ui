@@ -1,7 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const dns = require("node:dns");
 const net = require("node:net");
 const {
   applySmartTunneling,
@@ -137,7 +136,7 @@ class SmartDns {
     run,
     serialize,
     stopTunnel,
-    upstreams = () => dns.getServers(),
+    upstreams,
     proxy = createDnsProxy,
     forwardQuery = forward,
     enforceOwnership = true,
@@ -165,6 +164,23 @@ class SmartDns {
   }
   resolverName(id, domain) {
     return `wireguard-desktop-${this.userId}-${id}-${crypto.createHash("sha256").update(domain).digest("hex").slice(0, 16)}`;
+  }
+  async currentUpstreams() {
+    if (this.upstreams) return await this.upstreams();
+    const { stdout } = await this.run("/usr/sbin/scutil", ["--dns"]);
+    const global = stdout.split("DNS configuration (for scoped queries)")[0];
+    // Read the current primary resolver for every connection. Do not retain
+    // Node's resolver configuration from before a network/VPN change.
+    const primary = global
+      .split(/resolver #\d+/)
+      .find(
+        (block) =>
+          /nameserver\[\d+\]/.test(block) &&
+          !/^\s*(?:domain|options)\s*:/m.test(block),
+      );
+    return [
+      ...(primary || "").matchAll(/^\s*nameserver\[\d+\]\s*:\s*(\S+)/gm),
+    ].map((match) => match[1]);
   }
   async assertDirectory() {
     await fs.mkdir(this.resolverDirectory, { recursive: true, mode: 0o755 });
@@ -336,7 +352,9 @@ class SmartDns {
     const matches = (name) =>
       deferredDomains.includes(name) ||
       patterns.some((pattern) => matchesPattern(pattern, name));
-    const servers = this.upstreams().filter((server) => net.isIP(server));
+    const servers = (await this.currentUpstreams()).filter((server) =>
+      net.isIP(server),
+    );
     if (!servers.length) throw Error("Системные DNS-серверы недоступны");
     const serversFor = (name) =>
       replacements.find(
@@ -359,13 +377,24 @@ class SmartDns {
             const groups = await Promise.all(
               [1, 28].map(async (type) => {
                 const query = makeQuery(name, type);
+                let timer;
                 try {
                   return answers(
-                    await this.forwardQuery(query, serversFor(name)),
+                    await Promise.race([
+                      this.forwardQuery(query, serversFor(name)),
+                      new Promise((_, reject) => {
+                        timer = setTimeout(
+                          () => reject(Error("DNS timeout")),
+                          4000,
+                        );
+                      }),
+                    ]),
                     query,
                   );
                 } catch {
                   return [];
+                } finally {
+                  clearTimeout(timer);
                 }
               }),
             );

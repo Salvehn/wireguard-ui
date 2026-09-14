@@ -141,6 +141,36 @@ async function fixture(t, mode = "include") {
     stopped: () => stopped,
   };
 }
+test("primary DNS is refreshed after a network change and excludes supplemental resolvers", async (t) => {
+  const f = await fixture(t);
+  f.manager.upstreams = undefined;
+  let primary = "192.0.2.1";
+  f.manager.run = async () => ({
+    stdout: `DNS configuration\nresolver #1\n nameserver[0] : ${primary}\n if_index : 14 (en0)\nresolver #2\n domain : private.test\n nameserver[0] : 192.0.2.9\nDNS configuration (for scoped queries)\nresolver #1\n nameserver[0] : 192.0.2.8\n`,
+  });
+  assert.deepEqual(await f.manager.currentUpstreams(), ["192.0.2.1"]);
+  primary = "192.0.2.2";
+  assert.deepEqual(await f.manager.currentUpstreams(), ["192.0.2.2"]);
+});
+test("a stalled AAAA lookup does not discard a usable IPv4 endpoint", async (t) => {
+  const f = await fixture(t);
+  const { question, errorResponse } = require("../helper/dns-wire.cjs");
+  f.manager.forwardQuery = async (query) => {
+    if (question(query).type === 28) return new Promise(() => {});
+    const response = errorResponse(query, 0);
+    response.writeUInt16BE(1, 6);
+    return Buffer.concat([
+      response,
+      Buffer.from([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 198, 51, 100, 1]),
+    ]);
+  };
+  const session = await f.manager.prepare(
+    "wg0987654321",
+    original.replace("198.51.100.1:51820", "vpn.example.net:51820"),
+    { mode: "include", entries: ["*.private.test"] },
+  );
+  assert.match(session.compiled, /Endpoint=198\.51\.100\.1:51820/);
+});
 test("route table parser keeps exact masks even when more-specific routes exist", () => {
   assert.deepEqual(
     parseRouteTable(

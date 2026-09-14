@@ -144,7 +144,7 @@ async function fixture(t, { failActivation = false } = {}) {
 }
 test("helper connects wildcard-only tunnel, applies a DNS rule and fully cleans up on DOWN", async (t) => {
   const f = await fixture(t);
-  assert.equal((await f.core.handle({ op: "ping" })).version, 6);
+  assert.equal((await f.core.handle({ op: "ping" })).version, 7);
   await f.core.handle({
     op: "setActive",
     id,
