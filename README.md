@@ -29,3 +29,5 @@ Includes English and Russian, light and dark themes, and in-app updates with dow
 ![WireGuard Desktop with a fictional demo connection](docs/images/desktop-macos-window.png)
 
 *Demo data; no real VPN connection or private keys are shown.*
+
+Release automation: [macOS release script](docs/releases.md).

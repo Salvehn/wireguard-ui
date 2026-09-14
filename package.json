@@ -13,10 +13,11 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "dist:mac": "npm run prepare:helper && npm run build && electron-builder --mac dmg zip --arm64",
-    "release:mac": "npm run dist:mac && npm run update:manifest && node scripts/publish-release.mjs",
+    "release:mac": "node scripts/release-mac.mjs",
     "update:keygen": "node scripts/generate-update-key.mjs",
     "update:manifest": "node scripts/generate-update-manifest.mjs",
-    "prepare:helper": "node scripts/prepare-helper.mjs"
+    "prepare:helper": "node scripts/prepare-helper.mjs",
+    "test:release": "node --test scripts/release-utils.test.mjs"
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",
