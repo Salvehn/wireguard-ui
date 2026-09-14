@@ -267,7 +267,7 @@ test("DNS route changes run inside the shared application routing coordination h
 const privateId = "wg1111111111";
 const privateText =
   "# Company DNS\nnameserver 192.168.160.14\ndomain pamir.int\n";
-async function privateFixture(t) {
+async function privateFixture(t, config = original) {
   const f = await fixture(t);
   const target = path.join(f.resolverDirectory, "pamir.int");
   await fs.writeFile(target, privateText, { mode: 0o640 });
@@ -292,7 +292,7 @@ async function privateFixture(t) {
       Buffer.from([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 10, 20, 0, 7]),
     ]);
   };
-  const session = await f.manager.prepare(privateId, original, {
+  const session = await f.manager.prepare(privateId, config, {
     mode: "include",
     entries: ["pamir.int", "*.pamir.int"],
   });
@@ -354,6 +354,38 @@ test("an apex without DNS records does not block subdomains and later apex answe
   await proxy.observe("pamir.int", ["10.20.0.8"]);
   assert.equal(f.routes.get("10.20.0.7/32"), "utun9");
   assert.equal(f.routes.get("10.20.0.8/32"), "utun9");
+});
+test("private DNS stays routed through its split tunnel before and after learning domain addresses", async (t) => {
+  const f = await privateFixture(
+    t,
+    original.replace("0.0.0.0/0, ::/0", "192.168.176.0/24, 192.168.160.0/21"),
+  );
+  const session = f.privateSession;
+  assert.deepEqual([...systemRoutes(session.compiled)], ["192.168.160.14/32"]);
+  f.routes.set("192.168.160.14/32", "utun9");
+  await f.manager.activate(session, "utun9");
+  await f.proxies.at(-1).observe("gitlab.pamir.int", ["192.168.160.20"]);
+  assert.deepEqual([...systemRoutes(session.compiled)].sort(), [
+    "192.168.160.14/32",
+    "192.168.160.20/32",
+  ]);
+  assert.equal(f.routes.get("192.168.160.14/32"), "utun9");
+  assert.equal(
+    f.calls.some(
+      (call) =>
+        call.file === "/sbin/route" &&
+        call.args.includes("delete") &&
+        call.args.includes("192.168.160.14/32"),
+    ),
+    false,
+  );
+});
+test("a resolver outside original peer routes does not widen the split tunnel", async (t) => {
+  const f = await privateFixture(
+    t,
+    original.replace("0.0.0.0/0, ::/0", "10.20.0.0/24"),
+  );
+  assert.deepEqual([...systemRoutes(f.privateSession.compiled)], []);
 });
 test("resolver backups restore after a helper restart", async (t) => {
   const f = await privateFixture(t);

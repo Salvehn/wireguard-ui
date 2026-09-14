@@ -343,6 +343,13 @@ class SmartDns {
         (record) =>
           name === record.domain || name.endsWith("." + record.domain),
       )?.servers || servers;
+    // The private resolver must remain reachable before any domain addresses
+    // can be learned. Compilation intersects these with the original peer
+    // routes, so this cannot expand the VPN's configured network access.
+    const supportingEntries =
+      settings.mode === "include"
+        ? [...new Set(replacements.flatMap((record) => record.servers))]
+        : [];
     const cache = new Map();
     const lookup = async (name) => {
       if (!cache.has(name))
@@ -374,6 +381,7 @@ class SmartDns {
     const compiled = await applySmartTunneling(original, settings, lookup, {
       allowDynamic: true,
       deferredDomains,
+      additionalEntries: supportingEntries,
     });
     const session = {
       id,
@@ -382,6 +390,7 @@ class SmartDns {
       patterns,
       deferredDomains,
       matches,
+      supportingEntries,
       domains,
       servers,
       serversFor,
@@ -551,7 +560,7 @@ class SmartDns {
           session.lookup,
           {
             allowDynamic: true,
-            additionalEntries: [...learned],
+            additionalEntries: [...session.supportingEntries, ...learned],
             deferredDomains: session.deferredDomains,
           },
         );
