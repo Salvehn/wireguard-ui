@@ -18,8 +18,11 @@ for(const [name,source] of Object.entries(sources)){
 for(const name of ['server.cjs','core.cjs','smart-dns.cjs','dns-wire.cjs','app-tunnels.cjs'])await fs.copyFile('helper/'+name,path.join(base,name));
 await fs.copyFile('electron/app-tunneling.cjs',path.join(base,'app-tunneling.cjs'));
 await fs.copyFile('electron/config.cjs',path.join(base,'config.cjs'));
-await fs.copyFile('electron/smart-tunneling.cjs',path.join(base,'smart-tunneling.cjs'));
-await fs.cp('node_modules/ipaddr.js',path.join(base,'node_modules/ipaddr.js'),{recursive:true});
+// electron-builder excludes nested node_modules from extraResources. Keep this
+// standalone daemon dependency in an explicit vendor directory instead.
+await fs.writeFile(path.join(base,'smart-tunneling.cjs'),(await fs.readFile('electron/smart-tunneling.cjs','utf8')).replace('require("ipaddr.js")','require("./vendor/ipaddr.js")'));
+await fs.rm(path.join(base,'node_modules'),{recursive:true,force:true});
+await fs.cp('node_modules/ipaddr.js',path.join(base,'vendor/ipaddr.js'),{recursive:true});
 const licenses={Node:path.resolve(path.dirname(node),'../LICENSE'),WireGuardTools:prefix+'/opt/wireguard-tools/COPYING',WireGuardGo:prefix+'/opt/wireguard-go/LICENSE'};
 for(const [name,file] of Object.entries(licenses))await fs.copyFile(file,path.join(base,'licenses',name+'.txt'));
 // Bash source distribution license is shipped verbatim with the runtime.

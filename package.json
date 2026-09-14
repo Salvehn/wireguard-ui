@@ -1,6 +1,6 @@
 {
   "name": "wireguard-ui",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -84,7 +84,8 @@
         "from": "build/helper",
         "to": "helper"
       }
-    ]
+    ],
+    "afterPack": "scripts/verify-packaged-helper.cjs"
   },
   "description": "Compact local WireGuard desktop client"
 }
