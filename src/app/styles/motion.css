@@ -108,6 +108,9 @@ i {
     box-shadow 220ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
+  .connection-sparkline path {
+    transition: none;
+  }
   *,
   *::before,
   *::after {

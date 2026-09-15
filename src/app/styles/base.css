@@ -801,6 +801,7 @@ aside > .sidebar-foot {
 .connection {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 140px;
+  overflow: hidden;
 }
 .connection .primary {
   width: 140px;
@@ -812,6 +813,74 @@ aside > .sidebar-foot {
 }
 .connection p {
   min-height: 28px;
+}
+.connection-sparkline {
+  position: relative;
+  grid-column: 1 / -1;
+  width: calc(100% + 40px);
+  height: 64px;
+  margin: 2px -20px -24px;
+  border-top: 1px solid #2e3d34;
+  background: linear-gradient(180deg, #17201b 0%, #151c18 100%);
+  pointer-events: none;
+}
+.connection-sparkline svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.connection-sparkline path {
+  transition: d 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.connection-sparkline-area {
+  fill: url(#connection-area);
+}
+.connection-sparkline-line {
+  fill: none;
+  stroke: url(#connection-line);
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px #8bd2a559);
+}
+.connection-speed-marker {
+  position: absolute;
+  right: 9px;
+  width: 0;
+  height: 0;
+  transition: top 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.connection-speed-marker::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cff6d6;
+  box-shadow:
+    0 0 0 3px #8ed0a033,
+    0 0 8px #a9e8b6;
+  transform: translate(-50%, -50%);
+}
+.connection-speed-marker span {
+  position: absolute;
+  right: 9px;
+  padding: 3px 6px;
+  border: 1px solid #4c6756;
+  border-radius: 5px;
+  background: #18211dcc;
+  color: #b9cfbf;
+  font:
+    9px/1.2 ui-monospace,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+.connection-speed-marker.above span {
+  bottom: 8px;
+}
+.connection-speed-marker.below span {
+  top: 8px;
 }
 .stats-heading > .icon {
   min-width: 176px;

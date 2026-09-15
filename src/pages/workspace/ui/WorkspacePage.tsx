@@ -19,6 +19,7 @@ import { useTunnelActions } from "@/features/manage-tunnels";
 import { TunnelNavigation } from "@/widgets/tunnel-navigation";
 import { StatsPanel } from "@/widgets/tunnel-stats";
 import { EventLog } from "@/widgets/event-log";
+import { ConnectionSparkline } from "@/widgets/connection-sparkline";
 import { Card } from "@/shared/ui/card";
 import { ThemeSwitcher } from "@/features/change-theme";
 import { LanguageSwitcher } from "@/features/change-language";
@@ -245,6 +246,7 @@ export function WorkspacePage() {
                       ? t("Отключить")
                       : t("Подключить")}
               </button>
+              <ConnectionSparkline profile={profile} />
             </section>
             {profile.notes.length > 0 && (
               <div className="route-notes">

@@ -207,6 +207,21 @@ html[data-theme="light"] .card span {
 html[data-theme="light"] .card div {
   color: #294532;
 }
+html[data-theme="light"] .connection-sparkline {
+  border-color: #c9dccf;
+  background: linear-gradient(180deg, #f3f8f4 0%, #edf5ef 100%);
+}
+html[data-theme="light"] .connection-speed-marker span {
+  background: #f7fbf8dd;
+  border-color: #a9c8b2;
+  color: #476651;
+}
+html[data-theme="light"] .connection-speed-marker::after {
+  background: #4e9465;
+  box-shadow:
+    0 0 0 3px #6db18233,
+    0 0 7px #71b787;
+}
 html[data-theme="light"] .active-chips button {
   background: #d4e6d9;
   border-color: #abc9b5;

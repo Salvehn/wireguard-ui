@@ -22,6 +22,8 @@ Open **Smart tunneling** on a disconnected profile to choose what goes through t
 
 For a wildcard with an existing ordinary `/etc/resolver` file for the same domain, the helper forwards queries to that file’s DNS servers and restores the original file when disconnected. Other overlapping resolver rules still block connection. Exact domains covered by a wildcard also learn addresses from DNS queries, so a missing apex record does not prevent connection.
 
+**Profile DNS.** In **Configuration routes** mode, the `DNS` line from the imported `.conf` temporarily becomes the macOS system DNS. `wg-quick` does this by changing the DNS of the active network service, such as Wi-Fi, and restores its previous settings when the tunnel disconnects. If the client or Mac exits unexpectedly, check that network service: a corporate DNS server left there can affect all traffic. Selective Smart tunneling modes do not apply the profile’s `DNS` line; they keep the system DNS and create separate resolver files only for domains covered by domain rules.
+
 Address-list modes use system DNS. In application mode, system DNS follows ordinary routes, including routes from another macOS VPN, shared system services may not be identified as part of an app, and WireGuard peer statistics are unavailable. Restart selected applications after connecting. Connection or domain-route changes briefly restart the shared application engine and may interrupt its traffic. Updating the system helper may require an administrator password.
 
 Wildcard and application routing are experimental: automated checks pass, but live VPN integration has not yet been verified.
