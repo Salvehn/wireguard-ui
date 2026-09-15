@@ -14,7 +14,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: desktop-release-${{ github.ref }}
@@ -26,13 +26,13 @@ jobs:
     timeout-minutes: 45
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.14.0
           cache: npm
@@ -50,40 +50,30 @@ jobs:
         run: |
           codesign --verify --deep --strict "release/mac-arm64/WireGuard Desktop.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 'release/mac-arm64/WireGuard Desktop.app/Contents/Info.plist')" = "$(node -p "require('./package.json').version")"
-      - name: Require the update signing key
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        shell: bash
-        run: test -n "$UPDATE_PRIVATE_KEY_PEM"
-      - name: Create signed macOS update manifest
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        run: npm run update:manifest
       - name: Upload macOS release artifacts
         if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-macos-arm64
+          name: release-unsigned-macos-arm64
           if-no-files-found: error
           path: |
             release/WireGuard-Desktop-arm64.dmg
             release/WireGuard-Desktop-arm64.dmg.blockmap
             release/WireGuard-Desktop-arm64.zip
             release/WireGuard-Desktop-arm64.zip.blockmap
-            release/update-arm64.json
 
   windows:
     runs-on: windows-2022
     timeout-minutes: 45
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
-      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.14.0
           cache: npm
@@ -93,6 +83,9 @@ jobs:
           npm run test:win
           npm run test:release
       - name: Build Windows x64 installer
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: npm run dist:win
       - name: Install and smoke-test the Windows system backend
         shell: pwsh
@@ -109,43 +102,79 @@ jobs:
             Get-Content -LiteralPath "$env:ProgramData\WireGuardDesktop\Helper-$key\helper.log" -ErrorAction SilentlyContinue
             throw
           }
-      - name: Require the update signing key
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        shell: pwsh
-        run: if (-not $env:UPDATE_PRIVATE_KEY_PEM) { throw 'UPDATE_PRIVATE_KEY_PEM repository secret is missing' }
-      - name: Create signed Windows update manifest
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        run: npm run update:manifest:win
       - name: Upload Windows release artifacts
         if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-windows-x64
+          name: release-unsigned-windows-x64
           if-no-files-found: error
           path: |
+            release/WireGuard-Desktop-x64-Setup.exe
+            release/WireGuard-Desktop-x64-Setup.exe.blockmap
+
+  sign:
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    needs: [macos, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24.14.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-unsigned-*
+          path: release
+          merge-multiple: true
+      - name: Create signed update manifests
+        env:
+          UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
+        run: |
+          test -n "$UPDATE_PRIVATE_KEY_PEM"
+          npm run update:manifest
+          npm run update:manifest:win
+      - name: Upload signed release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-signed
+          if-no-files-found: error
+          path: |
+            release/WireGuard-Desktop-arm64.dmg
+            release/WireGuard-Desktop-arm64.dmg.blockmap
+            release/WireGuard-Desktop-arm64.zip
+            release/WireGuard-Desktop-arm64.zip.blockmap
+            release/update-arm64.json
             release/WireGuard-Desktop-x64-Setup.exe
             release/WireGuard-Desktop-x64-Setup.exe.blockmap
             release/update-windows-x64.json
 
   publish:
     if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
-    needs: [macos, windows]
+    needs: sign
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.14.0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: release-*
+          name: release-signed
           path: release
-          merge-multiple: true
       - name: Publish and verify the complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run publish:release
