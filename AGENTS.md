@@ -6,4 +6,4 @@
 
 ## Releases
 
-- Create and publish the base release through `npm run release:mac`. Its tag triggers the Windows release workflow, which adds verified Windows assets to the same GitHub release.
+- Start a release through `npm run release`. Its tag triggers the desktop release workflow, which builds and publishes verified macOS arm64 and Windows x64 assets together.

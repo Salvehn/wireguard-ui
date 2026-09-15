@@ -9,22 +9,9 @@ import {
 } from "./release-utils.mjs";
 
 process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-const args = process.argv.slice(2);
-if (args.includes("--help")) {
-  console.log(
-    "node scripts/publish-release.mjs [--notes FILE]\nPublish or resume the current version using already built, signed artifacts.",
-  );
-  process.exit(0);
-}
-let notes;
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--notes" && args[i + 1])
-    notes = fs.readFileSync(path.resolve(args[++i]), "utf8");
-  else throw Error("Unknown argument: " + args[i]);
-}
 const project = JSON.parse(fs.readFileSync("package.json", "utf8"));
-const version = project.version,
-  tag = "v" + version;
+const version = project.version;
+const tag = "v" + version;
 if (!/^\d+\.\d+\.\d+$/.test(version))
   throw Error("Only stable releases are supported");
 run("gh", ["auth", "status"]);
@@ -42,7 +29,6 @@ const api = (endpoint, body) =>
       true,
     ),
   );
-// gh supplies credentials from its existing login or GH_TOKEN. No token is read or printed.
 const request = (endpoint, method, payload) => {
   const file = path.resolve(
     "release",
@@ -63,27 +49,12 @@ let remoteCommit = remoteTag.object;
 if (remoteCommit.type === "tag")
   remoteCommit = api("git/tags/" + remoteCommit.sha).object;
 if (remoteCommit.sha !== tagged)
-  throw Error("Remote tag does not match the local commit");
+  throw Error("Remote tag does not match the build commit");
+
 const publicKey = fs.readFileSync("electron/update-public-key.pem");
-const { files } = await verifyArtifacts("release", version, publicKey);
-// The archive is signed by our updater; verify the macOS app bundle as well.
-run("/usr/bin/codesign", [
-  "--verify",
-  "--deep",
-  "--strict",
-  "release/mac-arm64/WireGuard Desktop.app",
-]);
-const appVersion = run(
-  "/usr/libexec/PlistBuddy",
-  [
-    "-c",
-    "Print :CFBundleShortVersionString",
-    "release/mac-arm64/WireGuard Desktop.app/Contents/Info.plist",
-  ],
-  true,
-).trim();
-if (appVersion !== version)
-  throw Error("Packaged app version does not match the release");
+const mac = await verifyArtifacts("release", version, publicKey, "mac");
+const windows = await verifyArtifacts("release", version, publicKey, "win");
+const files = [...mac.files, ...windows.files];
 const pages = JSON.parse(
   run(
     "gh",
@@ -98,37 +69,28 @@ const pages = JSON.parse(
 );
 let release = pages.flat().find((item) => item.tag_name === tag);
 if (release && !release.draft) {
-  verifyRemoteAssets(files, release.assets, false);
-  console.log(`Already published and verified: ${release.html_url}`);
+  verifyRemoteAssets(files, release.assets);
 } else {
-  if (!notes) {
+  if (!release) {
     const generated = request("releases/generate-notes", "POST", {
       tag_name: tag,
       target_commitish: tagged,
     });
-    notes = generated.body;
-  }
-  if (!release)
     release = request("releases", "POST", {
       tag_name: tag,
       target_commitish: tagged,
       name: `WireGuard Desktop ${version}`,
-      body: notes,
+      body: generated.body,
       draft: true,
       prerelease: false,
     });
-  else
-    release = request("releases/" + release.id, "PATCH", {
-      body: notes,
-      name: `WireGuard Desktop ${version}`,
-    });
+  }
   for (const file of files) {
     const old = release.assets.find((asset) => asset.name === file.name);
     if (old?.digest === file.digest && old.size === file.size) {
       console.log("Already uploaded: " + file.name);
       continue;
     }
-    // Only draft assets can be replaced. Published releases are immutable above.
     run("gh", [
       "release",
       "upload",
@@ -140,7 +102,7 @@ if (release && !release.draft) {
     ]);
   }
   release = api("releases/" + release.id);
-  verifyRemoteAssets(files, release.assets, false);
+  verifyRemoteAssets(files, release.assets);
   const latest = api("releases/latest");
   const { isNewerVersion } = await import("../electron/updater.cjs");
   if (isNewerVersion(latest.tag_name, version))
@@ -152,28 +114,37 @@ if (release && !release.draft) {
     make_latest: "true",
   });
 }
-// Confirm what the app will download, including the cryptographic signature.
+
 const { validateManifest } = await import("../electron/updater.cjs");
-let verified = false;
-for (let attempt = 0; attempt < 6; attempt++) {
-  try {
-    const response = await fetch(
-      `https://github.com/${repository}/releases/latest/download/update-arm64.json?release=${version}&check=${Date.now()}`,
-      { cache: "no-store", signal: AbortSignal.timeout(20000) },
-    );
-    if (!response.ok) throw Error("Manifest HTTP " + response.status);
-    const manifest = validateManifest(await response.json(), publicKey);
-    if (manifest.version !== version)
-      throw Error("Public update is not current yet");
-    verified = true;
-    break;
-  } catch (error) {
-    console.log("Waiting for public update endpoint: " + error.message);
-    if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 2000));
+for (const [name, expected] of [
+  ["update-arm64.json", mac.manifest],
+  ["update-windows-x64.json", windows.manifest],
+]) {
+  let verified = false;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const response = await fetch(
+        `https://github.com/${repository}/releases/latest/download/${name}?release=${version}&check=${Date.now()}`,
+        { cache: "no-store", signal: AbortSignal.timeout(20000) },
+      );
+      if (!response.ok) throw Error(`Manifest HTTP ${response.status}`);
+      const manifest = validateManifest(await response.json(), publicKey);
+      if (
+        manifest.version !== expected.version ||
+        manifest.sha512 !== expected.sha512
+      )
+        throw Error("Public update manifest does not match this release");
+      verified = true;
+      break;
+    } catch (error) {
+      console.log(`Waiting for ${name}: ${error.message}`);
+      if (attempt < 5)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
+  if (!verified)
+    throw Error(
+      `Release is published at ${release.html_url}, but ${name} could not be verified`,
+    );
 }
-if (!verified)
-  throw Error(
-    `Release is published at ${release.html_url}, but the public update endpoint could not be verified. Retry verification; do not replace the release.`,
-  );
-console.log(`Published and verified: ${release.html_url}`);
+console.log(`Published and verified macOS + Windows release: ${release.html_url}`);

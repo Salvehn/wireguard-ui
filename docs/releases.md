@@ -1,44 +1,44 @@
 # macOS and Windows releases
 
-Stable releases contain a macOS arm64 DMG/ZIP and a Windows x64 NSIS installer under the same version and Git tag.
+Stable releases contain a macOS arm64 DMG/ZIP and a Windows x64 NSIS installer under the same version and Git tag. GitHub Actions builds both platforms and publishes the release only after both jobs pass.
 
-On an Apple Silicon Mac, commit source changes on `main`, then run:
+Commit source changes on `main`, then run:
 
 ```sh
-npm run release:mac -- patch
+npm run release -- patch
 ```
 
-The command increments the version, runs tests, builds the macOS artifacts, signs the macOS update manifest, commits the version bump, creates and atomically pushes `main` and the tag, verifies the uploaded assets, and publishes the GitHub release.
+The command runs local tests and a renderer build, increments the version, commits the version bump, and atomically pushes `main` and the tag. The tag starts `.github/workflows/desktop-release.yml`.
 
-The tag starts `.github/workflows/windows-release.yml` on a Windows runner. That job:
+The macOS arm64 job:
+
+1. Runs all tests and assembles the privileged launchd helper.
+2. Builds the DMG and ZIP on a native Apple Silicon runner.
+3. Verifies the packaged helper, app signature, and bundle version.
+4. Creates the signed macOS update manifest.
+
+The Windows x64 job:
 
 1. Runs all tests and builds the renderer.
-2. Downloads pinned Node.js, sing-box, and official WireGuard for Windows artifacts and verifies their SHA-256 hashes.
-3. Compiles the Windows helper service host.
-4. Builds the x64 NSIS installer.
-5. Signs `update-windows-x64.json` with the existing update key.
-6. Adds the installer, blockmap, and manifest to the same published GitHub release and verifies their remote hashes.
+2. Downloads pinned Node.js, sing-box, and official WireGuard artifacts and verifies their SHA-256 hashes.
+3. Compiles the LocalSystem helper host and builds the NSIS installer.
+4. Installs the helper and smoke-tests native, wildcard-domain, and application routing on Windows.
+5. Creates the signed Windows update manifest.
+
+A final Linux job downloads both artifact sets, verifies both signed manifests and all hashes, creates or resumes one draft, uploads exactly eight assets, publishes it as latest, and verifies both public update endpoints.
 
 The repository must contain an Actions secret named `UPDATE_PRIVATE_KEY_PEM`. It contains the existing `.update-keys/update-private.pem`; installed applications trust the corresponding public key in `electron/update-public-key.pem`. Never generate a replacement key for an existing update channel.
 
-Use `minor`, `major`, or an explicit version instead of `patch`. Omit the version argument to publish the current package version. Add `--notes path/to/notes.md` for English release notes; otherwise GitHub generates them from commits.
+Use `minor`, `major`, or an explicit version instead of `patch`. Omit the version argument to release the current package version. Add `--notes path/to/notes.md` for English release notes; otherwise GitHub generates them from commits. `--skip-checks` skips duplicate local checks, while both Actions runners still run their required checks.
 
 Requirements:
 
 - A clean `main` branch with `origin` pointing to `Salvehn/wireguard-ui`.
-- `gh auth login` with permission to push and publish releases, or an appropriate `GH_TOKEN`.
-- The macOS build dependencies used by `npm run dist:mac`.
-- The update signing key at `.update-keys/update-private.pem`, `UPDATE_PRIVATE_KEY_FILE`, or `UPDATE_PRIVATE_KEY_BASE64`.
-- The `UPDATE_PRIVATE_KEY_PEM` GitHub Actions secret for Windows manifests.
-- A Windows code-signing certificate in the optional `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD` Actions secrets for public distribution. An unsigned development installer can be built without these values.
+- `gh auth login` with permission to push tags, edit releases, and run workflows.
+- The `UPDATE_PRIVATE_KEY_PEM` Actions secret.
+- Optional Windows Authenticode credentials in `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD`. Without them, Actions produces an unsigned Windows application installer whose update manifest remains cryptographically signed and verified.
 
-To resume an interrupted macOS upload using an existing build:
-
-```sh
-npm run release:mac -- --skip-build --notes path/to/notes.md
-```
-
-To rerun the Windows job for the current tag, use the **Windows release** workflow in GitHub Actions. Existing matching assets are reused; differing published assets are rejected.
+To rebuild an existing tag, rerun the **Desktop build and release** workflow with that tag. Published files are immutable: the publisher accepts matching assets and rejects any mismatch or unexpected asset.
 
 Local validation commands:
 
@@ -46,9 +46,13 @@ Local validation commands:
 npm run test:release
 npm test
 npm run build
-# On Windows x64:
-npm run dist:win
-npm run update:manifest:win
 ```
 
-Tags are never force-pushed. A failed macOS build stops before tagging. The Windows publisher only adds the three verified Windows assets to the matching published release and never changes its tag or release notes.
+Platform package commands remain available for diagnosis:
+
+```sh
+npm run dist:mac
+npm run dist:win
+```
+
+Tags are never force-pushed. A failed platform build leaves the release unpublished. Rerunning the workflow safely resumes a matching draft.

@@ -1,0 +1,138 @@
+name: Desktop build and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - run: npm ci
+      - name: Test
+        run: npm test
+      - name: Build macOS arm64 artifacts
+        run: npm run dist:mac
+      - name: Verify packaged macOS application
+        shell: bash
+        run: |
+          codesign --verify --deep --strict "release/mac-arm64/WireGuard Desktop.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 'release/mac-arm64/WireGuard Desktop.app/Contents/Info.plist')" = "$(node -p "require('./package.json').version")"
+      - name: Require the update signing key
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        shell: bash
+        run: test -n "$UPDATE_PRIVATE_KEY_PEM"
+      - name: Create signed macOS update manifest
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        run: npm run update:manifest
+      - name: Upload macOS release artifacts
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          if-no-files-found: error
+          path: |
+            release/WireGuard-Desktop-arm64.dmg
+            release/WireGuard-Desktop-arm64.dmg.blockmap
+            release/WireGuard-Desktop-arm64.zip
+            release/WireGuard-Desktop-arm64.zip.blockmap
+            release/update-arm64.json
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - run: npm ci
+      - name: Test
+        run: npm test
+      - name: Build Windows x64 installer
+        run: npm run dist:win
+      - name: Install and smoke-test the Windows system backend
+        shell: pwsh
+        run: |
+          $key = '0123456789abcdef'
+          $token = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+          $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          & .\build\helper-win\install-helper.ps1 -Source (Resolve-Path .\build\helper-win) -Key $key -Token $token -UserSid $sid
+          node .\scripts\smoke-windows-helper.mjs $key $token
+      - name: Require the update signing key
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        shell: pwsh
+        run: if (-not $env:UPDATE_PRIVATE_KEY_PEM) { throw 'UPDATE_PRIVATE_KEY_PEM repository secret is missing' }
+      - name: Create signed Windows update manifest
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        run: npm run update:manifest:win
+      - name: Upload Windows release artifacts
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          if-no-files-found: error
+          path: |
+            release/WireGuard-Desktop-x64-Setup.exe
+            release/WireGuard-Desktop-x64-Setup.exe.blockmap
+            release/update-windows-x64.json
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    needs: [macos, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.14.0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+      - name: Publish and verify the complete release
+        run: npm run publish:release

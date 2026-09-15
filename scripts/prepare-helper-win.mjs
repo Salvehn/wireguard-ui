@@ -64,24 +64,11 @@ const [nodeArchive, singBoxArchive, wireguardMsi] = await Promise.all(
 );
 const temporary = await fsp.mkdtemp(path.join(os.tmpdir(), "wg-desktop-win-"));
 try {
-  const powershellQuote = (value) =>
-    `'${String(value).replaceAll("'", "''")}'`;
   const expand = (archive, destination) => {
-    const command = `Expand-Archive -LiteralPath ${powershellQuote(archive)} -DestinationPath ${powershellQuote(destination)} -Force`;
+    fs.mkdirSync(destination, { recursive: true });
     execFileSync(
-      path.join(
-        process.env.SystemRoot || "C:\\Windows",
-        "System32",
-        "WindowsPowerShell",
-        "v1.0",
-        "powershell.exe",
-      ),
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-EncodedCommand",
-        Buffer.from(command, "utf16le").toString("base64"),
-      ],
+      path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe"),
+      ["-xf", archive, "-C", destination],
       { stdio: "inherit" },
     );
   };
