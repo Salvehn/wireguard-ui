@@ -9,6 +9,7 @@
     "build": "npm run check:architecture && tsc --noEmit && vite build",
     "start": "electron .",
     "test": "node --test electron/*.test.cjs",
+    "test:win": "node --test electron/config.test.cjs electron/dns-wire.test.cjs electron/editor.test.cjs electron/locale.test.cjs electron/profile-identity.test.cjs electron/shutdown.test.cjs electron/smart-tunneling.test.cjs electron/theme.test.cjs electron/tunnels.test.cjs electron/updater.test.cjs electron/windows-helper.test.cjs electron/windows-smart-dns.test.cjs",
     "package": "npm run prepare:helper && npm run build && electron-builder --mac dir",
     "check:architecture": "node scripts/check-architecture.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

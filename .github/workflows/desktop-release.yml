@@ -36,9 +36,13 @@ jobs:
         with:
           node-version: 24.14.0
           cache: npm
+      - name: Install macOS packaging dependencies
+        run: brew install bash wireguard-tools wireguard-go
       - run: npm ci
       - name: Test
-        run: npm test
+        run: |
+          npm test
+          npm run test:release
       - name: Build macOS arm64 artifacts
         run: npm run dist:mac
       - name: Verify packaged macOS application
@@ -85,7 +89,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Test
-        run: npm test
+        run: |
+          npm run test:win
+          npm run test:release
       - name: Build Windows x64 installer
         run: npm run dist:win
       - name: Install and smoke-test the Windows system backend
