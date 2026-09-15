@@ -37,7 +37,7 @@ jobs:
           node-version: 24.14.0
           cache: npm
       - name: Install macOS packaging dependencies
-        run: brew install bash wireguard-tools wireguard-go
+        run: brew install wireguard-tools wireguard-go
       - run: npm ci
       - name: Test
         run: |

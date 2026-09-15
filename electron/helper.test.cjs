@@ -20,7 +20,7 @@ test('helper handles UP/DOWN without shell and avoids a duplicate UP',async t=>{
  const core=createCore({base:'/root-owned/helper',runtimeDirectory:runtime,configDirectory:path.join(tmp,'configs'),run:async(executable,args,options)=>{
   assert.ok(!options.env.PATH.includes('/opt/homebrew'));assert.equal(options.shell,undefined);
   if(executable.endsWith('/wg'))return {stdout:active?'utun8\tSECRET\tpublic\t51820\toff\n':''};
-  calls.push(args);assert.equal(executable,'/root-owned/helper/bin/bash');
+  calls.push(args);assert.equal(executable,'/bin/bash');
   if(args[1]==='up'){active=true;server=net.createServer();await new Promise(resolve=>server.listen(path.join(runtime,'utun8.sock'),resolve));await fs.writeFile(path.join(runtime,id+'.name'),'utun8');}
   else{active=false;await new Promise(resolve=>server.close(resolve));await fs.unlink(path.join(runtime,id+'.name'));}
   return {stdout:'ok',stderr:''};

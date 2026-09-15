@@ -95,6 +95,7 @@ try {
     "windows-app-tunnels.cjs",
     "core.cjs",
     "smart-dns.cjs",
+    "app-tunnels.cjs",
     "dns-wire.cjs",
   ])
     await fsp.copyFile(path.join("helper", name), path.join(base, name));
