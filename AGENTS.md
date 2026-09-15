@@ -6,4 +6,4 @@
 
 ## Releases
 
-- Create and publish releases through the `release:mac` script defined in `package.json` by running `npm run release:mac`.
+- Create and publish the base release through `npm run release:mac`. Its tag triggers the Windows release workflow, which adds verified Windows assets to the same GitHub release.

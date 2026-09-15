@@ -5,10 +5,12 @@ import { t, message } from "@/shared/lib/i18n";
 
 export function SmartTunneling({
   profile,
+  platform,
   pending,
   saved,
 }: {
   profile: Profile;
+  platform: "darwin" | "win32";
   pending: boolean;
   saved: (state: State) => void;
 }) {
@@ -311,9 +313,9 @@ export function SmartTunneling({
                     <div key={appPath}>
                       <code title={appPath}>
                         {appPath
-                          .split("/")
+                          .split(/[\\/]/)
                           .at(-1)
-                          ?.replace(/\.app$/, "")}
+                          ?.replace(/\.(?:app|exe)$/i, "")}
                       </code>
                       <button
                         className="icon"
@@ -343,7 +345,9 @@ export function SmartTunneling({
               </p>
               <p className="smart-description">
                 {t(
-                  "Учитываются процессы внутри выбранного .app. Общие системные службы могут не определяться как часть приложения. После подключения перезапустите выбранные приложения.",
+                  platform === "win32"
+                    ? "Учитывается выбранный исполняемый файл .exe. После подключения перезапустите выбранные приложения."
+                    : "Учитываются процессы внутри выбранного .app. Общие системные службы могут не определяться как часть приложения. После подключения перезапустите выбранные приложения.",
                 )}
               </p>
               <p className="smart-description">
@@ -468,7 +472,9 @@ export function SmartTunneling({
               </p>
               <p className="smart-description">
                 {t(
-                  "Для масок требуется обновлённый системный помощник. macOS может запросить пароль администратора при его установке.",
+                  platform === "win32"
+                    ? "Для масок требуется системный помощник. Windows может запросить разрешение администратора при его установке."
+                    : "Для масок требуется обновлённый системный помощник. macOS может запросить пароль администратора при его установке.",
                 )}
               </p>
             </>

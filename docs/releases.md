@@ -1,30 +1,54 @@
-# macOS releases
+# macOS and Windows releases
 
-On an Apple Silicon Mac, commit the source changes on `main`, then run:
+Stable releases contain a macOS arm64 DMG/ZIP and a Windows x64 NSIS installer under the same version and Git tag.
+
+On an Apple Silicon Mac, commit source changes on `main`, then run:
 
 ```sh
 npm run release:mac -- patch
 ```
 
-This increments the patch version, runs the application and release checks, builds the DMG and ZIP, signs the update manifest, commits the version bump, creates and pushes the tag, uploads a draft, verifies all five asset hashes, and publishes it as the latest release. It then checks the public update manifest and its signature.
+The command increments the version, runs tests, builds the macOS artifacts, signs the macOS update manifest, commits the version bump, creates and atomically pushes `main` and the tag, verifies the uploaded assets, and publishes the GitHub release.
 
-Use `minor`, `major`, or an explicit version instead of `patch`. Omit the version argument to publish the current package version. Add `--notes path/to/notes.md` for release notes; otherwise GitHub generates them from commits.
+The tag starts `.github/workflows/windows-release.yml` on a Windows runner. That job:
+
+1. Runs all tests and builds the renderer.
+2. Downloads pinned Node.js, sing-box, and official WireGuard for Windows artifacts and verifies their SHA-256 hashes.
+3. Compiles the Windows helper service host.
+4. Builds the x64 NSIS installer.
+5. Signs `update-windows-x64.json` with the existing update key.
+6. Adds the installer, blockmap, and manifest to the same published GitHub release and verifies their remote hashes.
+
+The repository must contain an Actions secret named `UPDATE_PRIVATE_KEY_PEM`. It contains the existing `.update-keys/update-private.pem`; installed applications trust the corresponding public key in `electron/update-public-key.pem`. Never generate a replacement key for an existing update channel.
+
+Use `minor`, `major`, or an explicit version instead of `patch`. Omit the version argument to publish the current package version. Add `--notes path/to/notes.md` for English release notes; otherwise GitHub generates them from commits.
 
 Requirements:
 
-- A clean `main` branch in this repository, with `origin` pointing to `Salvehn/wireguard-ui`.
-- `gh auth login` with permission to push and publish releases; an existing `GH_TOKEN` also works.
-- The existing macOS build tools and dependencies used by `npm run dist:mac`.
-- The existing update signing key at `.update-keys/update-private.pem`, or `UPDATE_PRIVATE_KEY_FILE` / `UPDATE_PRIVATE_KEY_BASE64`. Never replace the key to fix a release: installed apps trust the corresponding public key.
+- A clean `main` branch with `origin` pointing to `Salvehn/wireguard-ui`.
+- `gh auth login` with permission to push and publish releases, or an appropriate `GH_TOKEN`.
+- The macOS build dependencies used by `npm run dist:mac`.
+- The update signing key at `.update-keys/update-private.pem`, `UPDATE_PRIVATE_KEY_FILE`, or `UPDATE_PRIVATE_KEY_BASE64`.
+- The `UPDATE_PRIVATE_KEY_PEM` GitHub Actions secret for Windows manifests.
+- A Windows code-signing certificate in the optional `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD` Actions secrets for public distribution. An unsigned development installer can be built without these values.
 
-To resume an interrupted upload using the existing build:
+To resume an interrupted macOS upload using an existing build:
 
 ```sh
 npm run release:mac -- --skip-build --notes path/to/notes.md
 ```
 
-The script checks the version, manifest signature, ZIP hash, app signature, remote tag, and uploaded asset hashes. It reuses matching draft assets and replaces mismatched assets only while the release is a draft. Already published releases are verified without overwriting them. Tags are never force-pushed.
+To rerun the Windows job for the current tag, use the **Windows release** workflow in GitHub Actions. Existing matching assets are reused; differing published assets are rejected.
 
-A failed build stops before tagging or publishing. If a version bump was written, inspect and commit it before retrying the current version. If publication succeeded but public endpoint verification failed, repeat the command with `--skip-build` to verify again.
+Local validation commands:
 
-`node scripts/publish-release.mjs --notes path/to/notes.md` runs only the publication phase for an already tagged and built version. `npm run test:release` runs the local release-validation tests.
+```sh
+npm run test:release
+npm test
+npm run build
+# On Windows x64:
+npm run dist:win
+npm run update:manifest:win
+```
+
+Tags are never force-pushed. A failed macOS build stops before tagging. The Windows publisher only adds the three verified Windows assets to the matching published release and never changes its tag or release notes.

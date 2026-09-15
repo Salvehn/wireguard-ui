@@ -1,0 +1,63 @@
+name: Windows build and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      GH_TOKEN: ${{ github.token }}
+      UPDATE_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_PRIVATE_KEY_PEM }}
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify update signing key is configured
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        shell: pwsh
+        run: if (-not $env:UPDATE_PRIVATE_KEY_PEM) { throw 'UPDATE_PRIVATE_KEY_PEM repository secret is missing' }
+      - name: Test and build Windows installer
+        run: npm run dist:win
+      - name: Install and smoke-test the Windows system backend
+        shell: pwsh
+        run: |
+          $key = '0123456789abcdef'
+          $token = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+          $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          & .\build\helper-win\install-helper.ps1 -Source (Resolve-Path .\build\helper-win) -Key $key -Token $token -UserSid $sid
+          node .\scripts\smoke-windows-helper.mjs $key $token
+      - name: Create signed Windows update manifest
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        run: npm run update:manifest:win
+      - name: Publish Windows assets to the matching release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+        run: npm run publish:win

@@ -98,7 +98,7 @@ const pages = JSON.parse(
 );
 let release = pages.flat().find((item) => item.tag_name === tag);
 if (release && !release.draft) {
-  verifyRemoteAssets(files, release.assets);
+  verifyRemoteAssets(files, release.assets, false);
   console.log(`Already published and verified: ${release.html_url}`);
 } else {
   if (!notes) {
@@ -140,7 +140,7 @@ if (release && !release.draft) {
     ]);
   }
   release = api("releases/" + release.id);
-  verifyRemoteAssets(files, release.assets);
+  verifyRemoteAssets(files, release.assets, false);
   const latest = api("releases/latest");
   const { isNewerVersion } = await import("../electron/updater.cjs");
   if (isNewerVersion(latest.tag_name, version))

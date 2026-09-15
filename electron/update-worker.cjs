@@ -87,6 +87,7 @@ function launch(appPath, argument) {
 }
 
 async function worker(config) {
+  if (config.platform === "win32") return windowsWorker(config);
   const appName = path.basename(config.currentApp),
     parent = path.dirname(config.currentApp);
   if (
@@ -179,22 +180,58 @@ async function worker(config) {
   }
 }
 
+async function windowsWorker(config) {
+  if (
+    !Number.isSafeInteger(config.parentPid) ||
+    !/^[a-f0-9]{32}$/.test(config.token) ||
+    !/^[A-Za-z0-9+/]{86}==$/.test(config.sha512) ||
+    typeof config.currentExecutable !== "string" ||
+    !config.currentExecutable.toLowerCase().endsWith(".exe") ||
+    typeof config.archivePath !== "string" ||
+    !config.archivePath.toLowerCase().endsWith(".exe")
+  )
+    throw Error("Некорректные параметры установщика");
+  if ((await sha512(config.archivePath)) !== config.sha512)
+    throw Error("Контрольная сумма установщика не совпадает");
+  if (config.readyPath)
+    await fsp.writeFile(config.readyPath, config.token, { mode: 0o600 });
+  await waitForExit(config.parentPid);
+  await run(config.archivePath, ["/S"], {
+    timeout: 300000,
+    windowsHide: true,
+  });
+  await fsp.rm(config.archivePath, { force: true });
+  const relaunched = spawn(config.currentExecutable, [], {
+    detached: true,
+    stdio: "ignore",
+    env: cleanEnvironment(),
+    windowsHide: false,
+  });
+  relaunched.on("error", () => {});
+  relaunched.unref();
+}
+
 async function launchUpdateWorker({
   app,
   archivePath,
   version,
   sha512: digest,
 }) {
-  const currentApp = path.resolve(path.dirname(process.execPath), "../..");
-  if (
-    !app.isPackaged ||
-    process.platform !== "darwin" ||
-    !currentApp.endsWith(".app")
-  )
-    throw Error("Установка доступна только из установленного приложения");
-  await fsp.access(path.dirname(currentApp), fs.constants.W_OK).catch(() => {
-    throw Error("Нет доступа для замены приложения в текущей папке");
-  });
+  if (process.platform === "win32") {
+    if (!app.isPackaged || !archivePath.toLowerCase().endsWith(".exe"))
+      throw Error("Установка доступна только из установленного приложения");
+  } else {
+    const currentApp = path.resolve(path.dirname(process.execPath), "../..");
+    if (
+      !app.isPackaged ||
+      process.platform !== "darwin" ||
+      !currentApp.endsWith(".app")
+    )
+      throw Error("Установка доступна только из установленного приложения");
+    await fsp.access(path.dirname(currentApp), fs.constants.W_OK).catch(() => {
+      throw Error("Нет доступа для замены приложения в текущей папке");
+    });
+  }
   const token = crypto.randomBytes(16).toString("hex");
   const workerDirectory = path.join(app.getPath("userData"), "updates");
   const workerPath = path.join(workerDirectory, `update-worker-${token}.cjs`);
@@ -205,7 +242,12 @@ async function launchUpdateWorker({
   const config = {
     parentPid: process.pid,
     archivePath,
-    currentApp,
+    ...(process.platform === "win32"
+      ? { platform: "win32", currentExecutable: process.execPath }
+      : {
+          platform: "darwin",
+          currentApp: path.resolve(path.dirname(process.execPath), "../.."),
+        }),
     version,
     sha512: digest,
     userData: app.getPath("userData"),
@@ -283,4 +325,9 @@ if (process.env.WG_UPDATE_WORKER === "1") {
     .finally(() => fsp.rm(workerFile, { force: true }).catch(() => {}));
 }
 
-module.exports = { launchUpdateWorker, markUpdateHealthy, worker };
+module.exports = {
+  launchUpdateWorker,
+  markUpdateHealthy,
+  worker,
+  windowsWorker,
+};

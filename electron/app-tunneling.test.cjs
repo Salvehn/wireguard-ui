@@ -78,6 +78,39 @@ test("application validation rejects paths and privileged requests outside the p
     compileApps(config.replace("0.0.0.0/0, ::/0", "garbage"), settings),
   );
 });
+test("Windows application rules use exact executable paths and safe Wintun routing", () => {
+  const windows = {
+    mode: "include",
+    paths: ["C:\\Program Files\\Browser\\browser.exe"],
+  };
+  assert.deepEqual(validateApps(windows, "win32"), windows);
+  for (const value of [
+    "browser.exe",
+    "C:\\Program Files\\Browser\\..\\bad.exe",
+    "C:\\Program Files\\Browser\\bad.com",
+    "C:\\Program Files\\Browser\\bad.exe\n",
+  ])
+    assert.throws(() =>
+      validateApps({ mode: "include", paths: [value] }, "win32"),
+    );
+  const compiled = compileApps(config, windows, "win32");
+  assert.deepEqual(compiled.route.rules[1].process_path, windows.paths);
+  const grouped = compileGroup(
+    [{ id: "wg0123456789", config, settings: windows }],
+    { routes: [], occupied: [], endpoints: [], platform: "win32" },
+  );
+  assert.equal(grouped.inbounds[0].strict_route, true);
+  assert.deepEqual(grouped.route.rules[0], {
+    ip_cidr: ["172.31.255.0/30", "fdce:5747:6170::/126"],
+    action: "reject",
+    method: "drop",
+  });
+  assert.deepEqual(
+    grouped.route.rules.find((rule) => rule.type === "logical").rules[1]
+      .process_path,
+    windows.paths,
+  );
+});
 async function fixture(t, { fail = false } = {}) {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "wg-apps-"));
   t.after(() => fs.rm(base, { recursive: true, force: true }));

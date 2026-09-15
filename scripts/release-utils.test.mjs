@@ -6,6 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   assets,
+  windowsAssets,
   nextVersion,
   verifyArtifacts,
   verifyRemoteAssets,
@@ -18,6 +19,41 @@ test("version bumps reset smaller components and refuse downgrades", () => {
   assert.equal(nextVersion("0.3.5"), "0.3.5");
   assert.throws(() => nextVersion("0.3.5", "0.3.4"), /older/);
   assert.throws(() => nextVersion("0.3.5", "invalid"), /Use/);
+});
+test("Windows release validation binds the installer to its signed manifest", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "wg-win-release-test-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
+  const installer = Buffer.from("test Windows installer");
+  const payload = {
+    schema: 1,
+    version: "0.4.0",
+    url: "https://github.com/Salvehn/wireguard-ui/releases/download/v0.4.0/WireGuard-Desktop-x64-Setup.exe",
+    size: installer.length,
+    sha512: crypto.createHash("sha512").update(installer).digest("base64"),
+  };
+  const manifest = {
+    ...payload,
+    signature: crypto
+      .sign(null, Buffer.from(JSON.stringify(payload)), privateKey)
+      .toString("base64"),
+  };
+  for (const name of windowsAssets)
+    await fs.writeFile(
+      path.join(dir, name),
+      name.endsWith("Setup.exe") ? installer : Buffer.from("asset"),
+    );
+  await fs.writeFile(
+    path.join(dir, "update-windows-x64.json"),
+    JSON.stringify(manifest),
+  );
+  const result = await verifyArtifacts(dir, "0.4.0", publicKey, "win");
+  assert.equal(result.files.length, 3);
+  verifyRemoteAssets(
+    result.files,
+    [...result.files, { name: "mac.dmg" }],
+    false,
+  );
 });
 test("release validation rejects tampered archives and mismatched versions", async (t) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "wg-release-test-"));

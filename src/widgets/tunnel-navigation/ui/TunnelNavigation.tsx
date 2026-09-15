@@ -68,7 +68,7 @@ export function TunnelNavigation({
             ? t("Системный помощник готов")
             : t("Нужен системный доступ")}
       </div>
-      <AppUpdate />
+      <AppUpdate platform={data.platform} />
     </aside>
   );
 }

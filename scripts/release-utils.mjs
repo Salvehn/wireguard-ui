@@ -4,13 +4,19 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 export const repository = "Salvehn/wireguard-ui";
-export const assets = [
+export const macAssets = [
   "WireGuard-Desktop-arm64.dmg",
   "WireGuard-Desktop-arm64.dmg.blockmap",
   "WireGuard-Desktop-arm64.zip",
   "WireGuard-Desktop-arm64.zip.blockmap",
   "update-arm64.json",
 ];
+export const windowsAssets = [
+  "WireGuard-Desktop-x64-Setup.exe",
+  "WireGuard-Desktop-x64-Setup.exe.blockmap",
+  "update-windows-x64.json",
+];
+export const assets = macAssets;
 export function run(file, args, capture = false) {
   return execFileSync(file, args, {
     encoding: "utf8",
@@ -41,26 +47,39 @@ export async function hashFile(file, algorithm = "sha256", encoding = "hex") {
   for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
   return hash.digest(encoding);
 }
-export async function verifyArtifacts(directory, version, publicKey) {
+export async function verifyArtifacts(
+  directory,
+  version,
+  publicKey,
+  platform = "mac",
+) {
+  const windows = platform === "win";
+  if (!windows && platform !== "mac") throw Error("Unknown release platform");
+  const manifestName = windows
+    ? "update-windows-x64.json"
+    : "update-arm64.json";
   const manifest = JSON.parse(
-    fs.readFileSync(path.join(directory, "update-arm64.json"), "utf8"),
+    fs.readFileSync(path.join(directory, manifestName), "utf8"),
   );
   const { validateManifest } = await import("../electron/updater.cjs");
   validateManifest(manifest, publicKey);
   if (
     manifest.version !== version ||
     manifest.url !==
-      `https://github.com/${repository}/releases/download/v${version}/WireGuard-Desktop-arm64.zip`
+      `https://github.com/${repository}/releases/download/v${version}/${windows ? "WireGuard-Desktop-x64-Setup.exe" : "WireGuard-Desktop-arm64.zip"}`
   )
     throw Error("Manifest does not match the release version");
-  const archive = path.join(directory, "WireGuard-Desktop-arm64.zip");
+  const archive = path.join(
+    directory,
+    windows ? "WireGuard-Desktop-x64-Setup.exe" : "WireGuard-Desktop-arm64.zip",
+  );
   if (
     fs.statSync(archive).size !== manifest.size ||
     (await hashFile(archive, "sha512", "base64")) !== manifest.sha512
   )
     throw Error("Archive does not match the signed manifest");
   const files = [];
-  for (const name of assets) {
+  for (const name of windows ? windowsAssets : macAssets) {
     const file = path.join(directory, name),
       size = fs.statSync(file).size;
     if (!size) throw Error(`Empty release asset: ${name}`);
@@ -73,8 +92,8 @@ export async function verifyArtifacts(directory, version, publicKey) {
   }
   return { manifest, files };
 }
-export function verifyRemoteAssets(local, remote) {
-  if (remote.length !== local.length)
+export function verifyRemoteAssets(local, remote, exact = true) {
+  if (exact && remote.length !== local.length)
     throw Error("Unexpected release asset count");
   for (const file of local) {
     const asset = remote.find((item) => item.name === file.name);

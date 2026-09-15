@@ -127,3 +127,36 @@ test("does not contact the update service from an unpackaged build", async () =>
   assert.equal(checked, false);
   assert.equal(manager.getState().supported, false);
 });
+
+test("Windows x64 uses its signed installer update channel", async () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
+  const archive = Buffer.from("installer");
+  const manifest = signedManifest(
+    {
+      schema: 1,
+      version: "1.2.4",
+      url: "https://github.com/example/app/releases/download/v1.2.4/app.exe",
+      size: archive.length,
+      sha512: crypto.createHash("sha512").update(archive).digest("base64"),
+    },
+    privateKey,
+  );
+  let requested = "";
+  const manager = createAppUpdater({
+    app: { getVersion: () => "1.2.3", isPackaged: true },
+    platform: "win32",
+    architecture: "x64",
+    publicKey,
+    fetch: async (url) => {
+      requested = url;
+      return response(manifest);
+    },
+  });
+  await manager.check();
+  assert.equal(manager.getState().supported, true);
+  assert.equal(manager.getState().status, "available");
+  assert.equal(
+    new URL(requested).pathname.endsWith("/update-windows-x64.json"),
+    true,
+  );
+});

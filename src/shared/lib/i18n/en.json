@@ -160,6 +160,7 @@
   "Приложение отключит активные туннели и перезапустится.": "The app will disconnect active tunnels and restart.",
   "Отключаем активные туннели перед установкой.": "Disconnecting active tunnels before installation.",
   "Проверка работает после установки приложения из DMG.": "Update checks work after installing the app from the DMG.",
+  "Проверка работает после установки приложения в Windows.": "Update checks work after installing the app on Windows.",
   "Проверить обновления": "Check for updates",
   "Скачать обновление": "Download update",
   "Перезапустить и установить": "Restart and install",
@@ -255,5 +256,7 @@
   "Не удалось обновить совместные маршруты приложений": "Could not update shared application routes",
   "Совместная маршрутизация с «{name}»: рабочие подсети сохраняют приоритет, совпадающие правила приложений использует последнее подключённое соединение.": "Shared routing with “{name}”: work subnets retain priority; overlapping app rules use the most recently connected profile.",
   "Не удалось определить процесс движка приложений": "Could not identify the application routing engine process",
-  "Все поддомены": "All subdomains"
+  "Все поддомены": "All subdomains",
+  "Учитывается выбранный исполняемый файл .exe. После подключения перезапустите выбранные приложения.": "The selected .exe executable is matched. Restart selected apps after connecting.",
+  "Для масок требуется системный помощник. Windows может запросить разрешение администратора при его установке.": "Wildcards require the system helper. Windows may request administrator approval when it is installed."
 }

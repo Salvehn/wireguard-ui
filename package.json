@@ -13,10 +13,14 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "dist:mac": "npm run prepare:helper && npm run build && electron-builder --mac dmg zip --arm64",
+    "dist:win": "npm run prepare:helper:win && npm run build && electron-builder --win nsis --x64",
     "release:mac": "node scripts/release-mac.mjs",
+    "publish:win": "node scripts/publish-windows-release.mjs",
     "update:keygen": "node scripts/generate-update-key.mjs",
     "update:manifest": "node scripts/generate-update-manifest.mjs",
+    "update:manifest:win": "node scripts/generate-update-manifest.mjs win",
     "prepare:helper": "node scripts/prepare-helper.mjs",
+    "prepare:helper:win": "node scripts/prepare-helper-win.mjs",
     "test:release": "node --test scripts/release-utils.test.mjs"
   },
   "dependencies": {
@@ -53,7 +57,32 @@
       "target": [
         "dmg",
         "zip"
+      ],
+      "extraResources": [
+        {
+          "from": "build/helper",
+          "to": "helper"
+        }
       ]
+    },
+    "win": {
+      "icon": "assets/Wireguard.iconset/icon_256x256.png",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "WireGuard-Desktop-${arch}-Setup.${ext}",
+      "extraResources": [
+        {
+          "from": "build/helper-win",
+          "to": "helper-win"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "deleteAppDataOnUninstall": false
     },
     "directories": {
       "output": "release"
@@ -80,12 +109,6 @@
         }
       ]
     },
-    "extraResources": [
-      {
-        "from": "build/helper",
-        "to": "helper"
-      }
-    ],
     "afterPack": "scripts/verify-packaged-helper.cjs"
   },
   "description": "Compact local WireGuard desktop client"

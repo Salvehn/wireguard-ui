@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { tunnelApi } from "../api/tunnel-api";
 import type { State } from "./types";
 const initialState: State = {
+  platform: "darwin",
   profiles: [],
   backend: null,
   operations: {},

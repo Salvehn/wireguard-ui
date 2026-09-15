@@ -211,6 +211,8 @@ async function createDnsProxy(
     matches,
     onError = () => {},
     forwardQuery = (query) => forward(query, servers),
+    port = 0,
+    listenHost = "127.0.0.1",
   },
   attempt = 0,
 ) {
@@ -288,19 +290,19 @@ async function createDnsProxy(
   });
   await new Promise((resolve, reject) => {
     udp.once("error", reject);
-    udp.bind(0, "127.0.0.1", resolve);
+    udp.bind(port, listenHost, resolve);
   });
   try {
     await new Promise((resolve, reject) => {
       tcp.once("error", reject);
-      tcp.listen(udp.address().port, "127.0.0.1", resolve);
+      tcp.listen(udp.address().port, listenHost, resolve);
     });
   } catch (error) {
     await new Promise((resolve) => udp.close(resolve));
     // A free UDP port may already be occupied by an unrelated TCP service.
-    if (error.code === "EADDRINUSE" && attempt < 8)
+    if (port === 0 && error.code === "EADDRINUSE" && attempt < 8)
       return createDnsProxy(
-        { servers, observe, matches, onError, forwardQuery },
+        { servers, observe, matches, onError, forwardQuery, port, listenHost },
         attempt + 1,
       );
     throw error;

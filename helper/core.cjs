@@ -9,7 +9,7 @@ const { hasWildcard, validateSettings } = require("./smart-tunneling.cjs");
 const { AppTunnels } = require("./app-tunnels.cjs");
 const { validateApps, enabled: appsEnabled } = require("./app-tunneling.cjs");
 const exec = promisify(execFile);
-const VERSION = 9;
+const VERSION = 10;
 const validId = (id) => typeof id === "string" && /^wg[a-f0-9]{10}$/.test(id);
 function validateRequest(request) {
   if (!request || typeof request !== "object" || Array.isArray(request))
@@ -68,11 +68,11 @@ function validateRequest(request) {
   }
   return request;
 }
-function sanitizedStats(text) {
+function sanitizedStats(text, validInterface = /^utun\d+$/) {
   const interfaces = {};
   for (const line of text.trim().split(/[\r\n]+/)) {
     const f = line.split("\t");
-    if (f.length === 5 && /^utun\d+$/.test(f[0]))
+    if (f.length === 5 && validInterface.test(f[0]))
       interfaces[f[0]] = {
         publicKey: f[2],
         listenPort: Number(f[3]),

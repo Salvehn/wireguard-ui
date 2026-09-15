@@ -30,24 +30,25 @@ async function updateSnapshot(ids,force=false){
 }
 async function setupHelper(){
  if(helperSetup)return helperSetup;
- helperSetup=(async()=>{helper={status:'installing',message:'macOS запрашивает разрешение на установку системного помощника'};try{
-  if(!await helperClient.available())await helperClient.install(app.isPackaged?path.join(process.resourcesPath,'helper'):path.join(__dirname,'../build/helper'));
+ helperSetup=(async()=>{helper={status:'installing',message:process.platform==='win32'?'Windows запрашивает разрешение на установку системного помощника':'macOS запрашивает разрешение на установку системного помощника'};try{
+  const helperName=process.platform==='win32'?'helper-win':'helper';if(!await helperClient.available())await helperClient.install(app.isPackaged?path.join(process.resourcesPath,helperName):path.join(__dirname,'../build',helperName));
   helper={status:'ready',message:''};helperSnapshot.updatedAt=0;log('Системный помощник готов. Повторные запросы пароля не нужны.');
  }catch(error){helper={status:'required',message:'Для управления VPN установите системный помощник. Потребуется разрешение администратора.'};log(error.message)}finally{helperSetup=null}})();return helperSetup;
 }
 async function profiles(){ const files=await fs.readdir(dir);await updateSnapshot(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(f=>f.slice(0,-5))); return Promise.all(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(async file=>{const id=file.slice(0,-5);const meta=JSON.parse(await fs.readFile(path.join(dir,id+'.json'),'utf8'));const runtimeState=helperSnapshot.profiles[id]||await runtime.read(id);return {id,...meta,...parseConfig(await fs.readFile(path.join(dir,file),'utf8')),...runtimeState,stats:runtimeState.active?runtimeState.stats||null:null}}))}
-async function state(){const all=await profiles();return {profiles:all.map(p=>({...p,notes:routeNotes(p,all)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
+async function state(){const all=await profiles();return {platform:process.platform,profiles:all.map(p=>({...p,notes:routeNotes(p,all,process.platform)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
 app.whenReady().then(async()=>{
  nativeTheme.themeSource='system';
  theme=createTheme(path.join(app.getPath('userData'),'theme.json'),()=>nativeTheme.shouldUseDarkColors);await theme.load();
  const applyAppearance=()=>{const color=theme.get().theme==='dark'?'#101416':'#f5f8f6';for(const window of BrowserWindow.getAllWindows())window.setBackgroundColor(color)};
  dir=path.join(app.getPath('userData'),'tunnels');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.chmod(dir,0o700);
  locale=createLocale(path.join(app.getPath('userData'),'locale.json'),()=>app.getPreferredSystemLanguages());await locale.load();
- runtime=new RuntimeStatus('/var/run/wireguard',path.join(app.getPath('userData'),'runtime-status.json'));await runtime.load();
- controller=new TunnelController({list:profiles,log,execute:async(profile,action)=>{
+ helperClient.configure(app.getPath('userData'));
+ runtime=process.platform==='darwin'?new RuntimeStatus('/var/run/wireguard',path.join(app.getPath('userData'),'runtime-status.json')):{load:async()=>{},read:async()=>({active:false,statusUnknown:false,interfaceName:null})};await runtime.load();
+ controller=new TunnelController({list:profiles,log,platform:process.platform,execute:async(profile,action)=>{
    if(helper.status!=='ready')throw Error('Сначала настройте системный помощник');
    const original=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
-   const settings=profile.smartTunneling||smartDefaults();const appRules=validateApps(action==='up'?settings.applications:undefined);const useApps=action==='up'&&appsEnabled(appRules);const dynamic=action==='up'&&hasWildcard(settings);
+   const settings=profile.smartTunneling||smartDefaults();const appRules=validateApps(action==='up'?settings.applications:undefined,process.platform);const useApps=action==='up'&&appsEnabled(appRules);const dynamic=action==='up'&&hasWildcard(settings);
    const config=action==='up'&&!dynamic&&!useApps?await applySmartTunneling(original,settings):original;
    try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config,...(useApps?{applications:appRules}:dynamic?{smartTunneling:settings}:{})});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
    finally{helperSnapshot.updatedAt=0}
@@ -95,11 +96,11 @@ app.whenReady().then(async()=>{
 
  const smartRevision=(config,settings)=>revision(config+JSON.stringify(settings));
  ipcMain.handle('choose-applications',async e=>{
-   mainOnly(e);const result=await dialog.showOpenDialog(win,{defaultPath:'/Applications',properties:['openFile','multiSelections'],filters:[{name:'Applications',extensions:['app']}]});
+   mainOnly(e);const windows=process.platform==='win32';const result=await dialog.showOpenDialog(win,{defaultPath:windows?process.env.ProgramFiles:'/Applications',properties:['openFile','multiSelections'],filters:[{name:'Applications',extensions:[windows?'exe':'app']}]});
    if(result.canceled)return [];
    const paths=await Promise.all(result.filePaths.map(file=>fs.realpath(file)));
-   for(const file of paths){if(!(await fs.stat(path.join(file,'Contents/Info.plist'))).isFile())throw Error('Выберите приложение .app')}
-   return validateApps({mode:'off',paths}).paths;
+   for(const file of paths){if(windows?!(await fs.stat(file)).isFile():!(await fs.stat(path.join(file,'Contents/Info.plist'))).isFile())throw Error(windows?'Выберите исполняемый файл .exe':'Выберите приложение .app')}
+   return validateApps({mode:'off',paths},process.platform).paths;
  });
  ipcMain.handle('read-smart-tunneling',async(e,id)=>{
    mainOnly(e);const profile=(await profiles()).find(p=>p.id===id);if(!profile)throw Error('Туннель не найден');
@@ -113,10 +114,10 @@ app.whenReady().then(async()=>{
      if(profile.active||profile.statusUnknown)throw Error('Сначала отключите этот туннель, затем сохраните изменения');
      const config=await fs.readFile(path.join(dir,id+'.conf'),'utf8');
      if(smartRevision(config,profile.smartTunneling||smartDefaults())!==expected)throw Error('Конфиг изменился. Закройте редактор и откройте заново');
-     const applications=validateApps(input?.applications);
+     const applications=validateApps(input?.applications,process.platform);
      if(appsEnabled(applications)&&input.mode!=='off')throw Error('Выберите правила по адресам или по приложениям');
      const settings={...validateSettingsForSave(config,input),applications};
-     if(appsEnabled(applications))compileApps(config,applications);
+     if(appsEnabled(applications))compileApps(config,applications,process.platform);
      const target=path.join(dir,id+'.json');const meta=JSON.parse(await fs.readFile(target,'utf8'));
      const temp=target+'.'+crypto.randomBytes(6).toString('hex')+'.tmp';
      try{await fs.writeFile(temp,JSON.stringify({...meta,smartTunneling:settings}),{mode:0o600,flag:'wx'});await fs.rename(temp,target)}finally{await fs.rm(temp,{force:true})}
@@ -139,21 +140,21 @@ app.whenReady().then(async()=>{
  ipcMain.handle('open-main',e=>{authorized(e);popover.hide();win.show();win.focus()});
  function secureWindow(window){window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',e=>e.preventDefault())}
  function createWindow(){
-   win=new BrowserWindow({width:1040,height:720,minWidth:840,minHeight:600,titleBarStyle:'hiddenInset',backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+   win=new BrowserWindow({width:1040,height:720,minWidth:840,minHeight:600,...(process.platform==='darwin'?{titleBarStyle:'hiddenInset'}:{autoHideMenuBar:true}),backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
    secureWindow(win);win.loadFile(path.join(__dirname,'../dist/index.html'));
    win.on('close',event=>{if(!quitting){event.preventDefault();win.hide()}});
  }
  function trayIcon(){
-   const icon=nativeImage.createFromPath(path.join(__dirname,'../dist/wireguard.png')).resize({width:22,height:22});icon.setTemplateImage(true);return icon;
+   const icon=nativeImage.createFromPath(path.join(__dirname,'../dist/wireguard.png')).resize({width:22,height:22});if(process.platform==='darwin')icon.setTemplateImage(true);return icon;
  }
  createWindow();
  win.webContents.once('did-finish-load',()=>{void markUpdateHealthy(app).catch(error=>log(error.message));if(!updateRolledBack)setTimeout(()=>{void updater.check()},4000)});
  popover=new BrowserWindow({width:360,height:440,show:false,frame:false,resizable:false,skipTaskbar:true,alwaysOnTop:true,backgroundColor:'#101416',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  applyAppearance();secureWindow(popover);popover.loadFile(path.join(__dirname,'../dist/index.html'),{hash:'tray'});popover.on('blur',()=>popover.hide());
  tray=new Tray(trayIcon());tray.setToolTip('WireGuard Desktop');
- const togglePopover=()=>{if(popover.isVisible()){popover.hide();return}const anchor=tray.getBounds();const area=screen.getDisplayNearestPoint({x:anchor.x,y:anchor.y}).workArea;popover.setPosition(Math.max(area.x,Math.min(anchor.x+Math.round(anchor.width/2)-180,area.x+area.width-360)),Math.max(area.y,anchor.y+anchor.height+5));popover.show();popover.focus()};
+ const togglePopover=()=>{if(popover.isVisible()){popover.hide();return}const anchor=tray.getBounds();const area=screen.getDisplayNearestPoint({x:anchor.x,y:anchor.y}).workArea;const below=anchor.y+anchor.height+5;const y=below+440<=area.y+area.height?below:Math.max(area.y,anchor.y-445);popover.setPosition(Math.max(area.x,Math.min(anchor.x+Math.round(anchor.width/2)-180,area.x+area.width-360)),y);popover.show();popover.focus()};
  tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:t('Открыть WireGuard Desktop'),click:()=>{win.show();win.focus()}},{label:t('Завершить приложение (отключить туннели)'),click:()=>app.quit()}])));
- const updateTray=async()=>{publishLocale();try{const all=await profiles();const count=all.filter(p=>p.active).length;tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · '+t('Активно:')+' '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · '+t('Ошибка чтения состояния'))}};
+ const updateTray=async()=>{publishLocale();try{const all=await profiles();const count=all.filter(p=>p.active).length;if(process.platform==='darwin')tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · '+t('Активно:')+' '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · '+t('Ошибка чтения состояния'))}};
  void setupHelper().then(updateTray);trayTimer=setInterval(updateTray,2500);
  // Quit must bring down active tunnels first: the helper daemon outlives the app.
  app.on('before-quit',event=>{quitting=true;if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});

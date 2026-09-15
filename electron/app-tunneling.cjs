@@ -3,7 +3,11 @@ const { parseConfig } = require("./config.cjs");
 const { network, cidr, subtract } = require("./smart-tunneling.cjs");
 const enabled = (settings) =>
   settings?.mode === "include" || settings?.mode === "exclude";
-function validateApps(input = { mode: "off", paths: [] }) {
+function appPlatform(value = process.platform) {
+  return value === "win32" ? "win32" : "darwin";
+}
+function validateApps(input = { mode: "off", paths: [] }, platform) {
+  const target = appPlatform(platform);
   if (
     !input ||
     !["off", "include", "exclude"].includes(input.mode) ||
@@ -17,12 +21,20 @@ function validateApps(input = { mode: "off", paths: [] }) {
         if (
           typeof value !== "string" ||
           value.length > 1024 ||
-          !value.startsWith("/") ||
-          !value.endsWith(".app") ||
           /[\x00-\x1f\x7f]/.test(value) ||
-          path.normalize(value) !== value
+          (target === "win32"
+            ? !path.win32.isAbsolute(value) ||
+              !value.toLowerCase().endsWith(".exe") ||
+              path.win32.normalize(value) !== value
+            : !value.startsWith("/") ||
+              !value.endsWith(".app") ||
+              path.posix.normalize(value) !== value)
         )
-          throw Error("Выберите приложение .app");
+          throw Error(
+            target === "win32"
+              ? "Выберите исполняемый файл .exe"
+              : "Выберите приложение .app",
+          );
         return value;
       }),
     ),
@@ -32,9 +44,10 @@ function validateApps(input = { mode: "off", paths: [] }) {
   return { mode: input.mode, paths };
 }
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function compileApps(text, input) {
+function compileApps(text, input, platform) {
+  const target = appPlatform(platform);
   parseConfig(text);
-  const settings = validateApps(input);
+  const settings = validateApps(input, target);
   if (!enabled(settings)) throw Error("Маршрутизация по приложениям выключена");
   const iface = {},
     peers = [];
@@ -103,9 +116,14 @@ function compileApps(text, input) {
     }),
   };
   const routes = [...new Set(endpoint.peers.flatMap((p) => p.allowed_ips))];
-  const patterns = settings.paths.map(
-    (p) => "^" + escapeRegex(p) + "/Contents/",
-  );
+  const applicationRule =
+    target === "win32"
+      ? { process_path: settings.paths }
+      : {
+          process_path_regex: settings.paths.map(
+            (p) => "^" + escapeRegex(p) + "/Contents/",
+          ),
+        };
   return {
     log: { level: "info", timestamp: false, disabled: false },
     dns: { servers: [{ type: "local", tag: "system" }] },
@@ -128,7 +146,7 @@ function compileApps(text, input) {
       rules: [
         { port: 53, action: "route", outbound: "direct" },
         {
-          process_path_regex: patterns,
+          ...applicationRule,
           action: "route",
           outbound: settings.mode === "include" ? "vpn" : "direct",
         },
@@ -145,6 +163,7 @@ function compileGroup(
   sessions,
   environment = { routes: [], occupied: [], endpoints: [] },
 ) {
+  const platform = appPlatform(environment.platform);
   if (!Array.isArray(sessions) || !sessions.length || sessions.length > 32)
     throw Error("Допустимо от 1 до 32 соединений с правилами приложений");
   if (environment.routes.length > 8192 || environment.occupied.length > 32768)
@@ -154,11 +173,21 @@ function compileGroup(
     if (!/^wg[a-f0-9]{10}$/.test(session.id) || ids.has(session.id))
       throw Error("Invalid application session");
     ids.add(session.id);
-    return { session, config: compileApps(session.config, session.settings) };
+    return {
+      session,
+      config: compileApps(session.config, session.settings, platform),
+    };
   });
   const native = environment.routes
     .map((item) => {
-      if (!/^utun\d+$/.test(item.interfaceName))
+      if (
+        platform === "darwin"
+          ? !/^utun\d+$/.test(item.interfaceName)
+          : typeof item.interfaceName !== "string" ||
+            !item.interfaceName.length ||
+            item.interfaceName.length > 128 ||
+            /[\x00-\x1f\x7f]/.test(item.interfaceName)
+      )
         throw Error("Invalid native interface");
       return { ...item, range: network(item.route) };
     })
@@ -231,9 +260,10 @@ function compileGroup(
   // Newest connection wins when several app rules match. An exclusion skips
   // that connection and continues through the other apps/native routes.
   for (const { session, config } of [...compiled].reverse()) {
-    const predicate = {
-      process_path_regex: config.route.rules[1].process_path_regex,
-    };
+    const predicate =
+      platform === "win32"
+        ? { process_path: config.route.rules[1].process_path }
+        : { process_path_regex: config.route.rules[1].process_path_regex };
     if (session.settings.mode === "exclude") predicate.invert = true;
     rules.push({
       type: "logical",
@@ -255,6 +285,16 @@ function compileGroup(
     });
   }
   const result = compiled[0].config;
+  if (platform === "win32") {
+    result.inbounds[0].strict_route = true;
+    // Wintun peer addresses are gateways on Windows. Never route traffic sent
+    // to those addresses back through the same TUN interface.
+    rules.unshift({
+      ip_cidr: ["172.31.255.0/30", "fdce:5747:6170::/126"],
+      action: "reject",
+      method: "drop",
+    });
+  }
   result.inbounds[0].route_address = unique.map(cidr);
   result.endpoints = compiled.map(({ session, config }) => ({
     ...config.endpoints[0],
@@ -273,3 +313,4 @@ function compileGroup(
   return result;
 }
 module.exports.compileGroup = compileGroup;
+module.exports.appPlatform = appPlatform;

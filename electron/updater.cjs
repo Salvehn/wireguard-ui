@@ -5,6 +5,8 @@ const path = require("node:path");
 
 const UPDATE_MANIFEST_URL =
   "https://github.com/Salvehn/wireguard-ui/releases/latest/download/update-arm64.json";
+const WINDOWS_UPDATE_MANIFEST_URL =
+  "https://github.com/Salvehn/wireguard-ui/releases/latest/download/update-windows-x64.json";
 const MAX_UPDATE_SIZE = 1024 * 1024 * 1024;
 
 function manifestPayload(manifest) {
@@ -95,11 +97,13 @@ function createAppUpdater({
   publicKey,
   publish = () => {},
   installUpdate = async () => {},
-  manifestUrl = UPDATE_MANIFEST_URL,
+  manifestUrl,
   startupError = "",
   platform = process.platform,
   architecture = process.arch,
 }) {
+  manifestUrl ||=
+    platform === "win32" ? WINDOWS_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
   let operation = null,
     available = null,
     archivePath = "";
@@ -113,7 +117,9 @@ function createAppUpdater({
     bytesPerSecond: 0,
     error: startupError,
     supported:
-      app.isPackaged && platform === "darwin" && architecture === "arm64",
+      app.isPackaged &&
+      ((platform === "darwin" && architecture === "arm64") ||
+        (platform === "win32" && architecture === "x64")),
   };
   const snapshot = () => ({ ...state });
   const update = (patch) => {
@@ -193,9 +199,12 @@ function createAppUpdater({
       return run(async () => {
         const directory = path.join(app.getPath("userData"), "updates");
         await fsp.mkdir(directory, { recursive: true, mode: 0o700 });
+        const extension = path.extname(new URL(available.url).pathname);
+        if (!/^\.(?:zip|exe)$/i.test(extension))
+          throw Error("Неподдерживаемый формат обновления");
         const finalPath = path.join(
             directory,
-            `WireGuard-Desktop-${available.version}-arm64.zip`,
+            `WireGuard-Desktop-${available.version}-${platform}-${architecture}${extension}`,
           ),
           partialPath = finalPath + ".part";
         await fsp.rm(partialPath, { force: true });
@@ -296,6 +305,7 @@ function createAppUpdater({
 
 module.exports = {
   UPDATE_MANIFEST_URL,
+  WINDOWS_UPDATE_MANIFEST_URL,
   createAppUpdater,
   fileSha512,
   isNewerVersion,

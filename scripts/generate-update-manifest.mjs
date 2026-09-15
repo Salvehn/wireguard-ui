@@ -5,13 +5,21 @@ import path from "node:path";
 
 const project = JSON.parse(await fsp.readFile("package.json", "utf8"));
 const version = project.version;
-const archiveName = "WireGuard-Desktop-arm64.zip";
+const platform = process.argv[2] || "mac";
+if (!["mac", "win"].includes(platform)) throw Error("Use mac or win");
+const archiveName =
+  platform === "win"
+    ? "WireGuard-Desktop-x64-Setup.exe"
+    : "WireGuard-Desktop-arm64.zip";
 const archive = path.resolve("release", archiveName);
 const privateFile =
   process.env.UPDATE_PRIVATE_KEY_FILE ||
   path.resolve(".update-keys/update-private.pem");
 const publicFile = path.resolve("electron/update-public-key.pem");
-const output = path.resolve("release/update-arm64.json");
+const output = path.resolve(
+  "release",
+  platform === "win" ? "update-windows-x64.json" : "update-arm64.json",
+);
 
 const hash = crypto.createHash("sha512");
 for await (const chunk of fs.createReadStream(archive)) hash.update(chunk);
@@ -24,11 +32,13 @@ const payload = {
   sha512: hash.digest("base64"),
 };
 const serialized = JSON.stringify(payload);
-const privateKey = process.env.UPDATE_PRIVATE_KEY_BASE64
-  ? Buffer.from(process.env.UPDATE_PRIVATE_KEY_BASE64, "base64").toString(
-      "utf8",
-    )
-  : await fsp.readFile(privateFile, "utf8");
+const privateKey = process.env.UPDATE_PRIVATE_KEY_PEM
+  ? process.env.UPDATE_PRIVATE_KEY_PEM
+  : process.env.UPDATE_PRIVATE_KEY_BASE64
+    ? Buffer.from(process.env.UPDATE_PRIVATE_KEY_BASE64, "base64").toString(
+        "utf8",
+      )
+    : await fsp.readFile(privateFile, "utf8");
 const signature = crypto
   .sign(null, Buffer.from(serialized), privateKey)
   .toString("base64");

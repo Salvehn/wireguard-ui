@@ -14,7 +14,7 @@ function size(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
-export function AppUpdate() {
+export function AppUpdate({ platform }: { platform: "darwin" | "win32" }) {
   const state = useAppUpdate();
   const [open, setOpen] = useState(false);
   const previousStatus = useRef(state.status);
@@ -126,7 +126,13 @@ export function AppUpdate() {
             <p className="update-error">{message(state.error)}</p>
           )}
           {!state.supported && (
-            <p>{t("Проверка работает после установки приложения из DMG.")}</p>
+            <p>
+              {t(
+                platform === "win32"
+                  ? "Проверка работает после установки приложения в Windows."
+                  : "Проверка работает после установки приложения из DMG.",
+              )}
+            </p>
           )}
           {state.supported &&
             (state.status === "idle" ||

@@ -257,6 +257,7 @@ export function WorkspacePage() {
             )}
             <SmartTunneling
               profile={profile}
+              platform={data.platform}
               pending={!!operation}
               saved={setData}
             />

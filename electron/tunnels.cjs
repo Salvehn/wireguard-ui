@@ -1,6 +1,6 @@
 const ipaddr = require('ipaddr.js');
 
-function routeNotes(profile, others) {
+function routeNotes(profile, others, platform = process.platform) {
   const notes = [];
   const appMode = p => ['include','exclude'].includes(p.smartTunneling?.applications?.mode);
   const usesDNS = p => p.dns && !appMode(p) && (!p.smartTunneling || p.smartTunneling.mode==='off');
@@ -12,15 +12,15 @@ function routeNotes(profile, others) {
       ranges(other.allowedIPs).some(([b, bitsB]) => a.kind() === b.kind() && a.match(b, Math.min(bitsA, bitsB))));
     if (overlaps && (appMode(profile)||appMode(other))) notes.push(`Совместная маршрутизация с «${other.name}»: рабочие подсети сохраняют приоритет, совпадающие правила приложений использует последнее подключённое соединение.`);
     else if (overlaps) notes.push(`Маршруты пересекаются с «${other.name}». Более узкая сеть имеет приоритет; одинаковые маршруты могут конфликтовать.`);
-    if (usesDNS(profile) && usesDNS(other)) notes.push(`DNS задан также в «${other.name}». macOS использует общие настройки DNS, результат зависит от порядка подключения.`);
+    if (usesDNS(profile) && usesDNS(other)) notes.push(`DNS задан также в «${other.name}». ${platform === 'win32' ? 'Windows' : 'macOS'} использует общие настройки DNS, результат зависит от порядка подключения.`);
   }
   return notes;
 }
 
-// Serialize changes to macOS routes/DNS, without limiting the number of active tunnels.
+// Serialize system route and DNS changes without limiting active tunnels.
 class TunnelController {
-  constructor({list, execute, log}) {
-    this.list = list; this.execute = execute; this.log = log;
+  constructor({list, execute, log, platform = process.platform}) {
+    this.list = list; this.execute = execute; this.log = log; this.platform = platform;
     this.pending = new Map(); this.tail = Promise.resolve();
   }
   setActive(id, active) {
@@ -33,7 +33,7 @@ class TunnelController {
       if (!profile) throw Error('Туннель не найден');
       if (!profile.statusUnknown && profile.active === active) return;
       this.pending.set(id, active ? 'connecting' : 'disconnecting');
-      if (active) for (const note of routeNotes(profile, all)) this.log(`${profile.name}: ${note}`);
+      if (active) for (const note of routeNotes(profile, all, this.platform)) this.log(`${profile.name}: ${note}`);
       this.log(`${profile.name}: ${active ? 'подключение' : 'отключение'}, выполняется системным помощником`);
       const output = await this.execute(profile, active ? 'up' : 'down');
       this.log(`${profile.name}: ${output || 'операция завершена'}`);

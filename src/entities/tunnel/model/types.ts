@@ -34,6 +34,7 @@ export type Profile = {
   stats: Stats | null;
 };
 export type State = {
+  platform: "darwin" | "win32";
   profiles: Profile[];
   backend: string | null;
   operations: Record<string, string>;
