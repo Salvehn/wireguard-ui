@@ -7,7 +7,9 @@ using System.Threading;
 namespace WireGuardDesktop {
   sealed class HelperService : ServiceBase {
     Process child;
-    readonly string root = AppDomain.CurrentDomain.BaseDirectory;
+    readonly string root = Directory.GetParent(
+      AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)
+    ).FullName;
     public HelperService() {
       var key = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar)).Replace("Helper-", "");
       ServiceName = "WireGuardDesktopHelper-" + key;
