@@ -28,6 +28,23 @@ const request = (command, timeout = 130000) =>
       }
     });
   });
+const sleep = (milliseconds) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+const waitForHelper = async () => {
+  const deadline = Date.now() + 30000;
+  let lastError;
+  do {
+    try {
+      return await request({ op: "ping" }, 2000);
+    } catch (error) {
+      lastError = error;
+      await sleep(250);
+    }
+  } while (Date.now() < deadline);
+  throw new Error(
+    `Windows helper did not become ready within 30 seconds: ${lastError?.message || lastError}`,
+  );
+};
 const wireguard = path.join(
   process.env.ProgramFiles || "C:\\Program Files",
   "WireGuard",
@@ -57,7 +74,7 @@ const deactivate = async (id) => {
   } catch {}
 };
 try {
-  const ping = await request({ op: "ping" }, 5000);
+  const ping = await waitForHelper();
   if (ping.version !== 10) throw Error("unexpected helper version");
 
   const native = await request({

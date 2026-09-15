@@ -101,7 +101,14 @@ jobs:
           $token = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
           $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
           & .\build\helper-win\install-helper.ps1 -Source (Resolve-Path .\build\helper-win) -Key $key -Token $token -UserSid $sid
-          node .\scripts\smoke-windows-helper.mjs $key $token
+          try {
+            node .\scripts\smoke-windows-helper.mjs $key $token
+            if ($LASTEXITCODE -ne 0) { throw "Windows helper smoke test failed with exit code $LASTEXITCODE" }
+          } catch {
+            & sc.exe query "WireGuardDesktopHelper-$key"
+            Get-Content -LiteralPath "$env:ProgramData\WireGuardDesktop\Helper-$key\helper.log" -ErrorAction SilentlyContinue
+            throw
+          }
       - name: Require the update signing key
         if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         shell: pwsh
