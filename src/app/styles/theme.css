@@ -207,10 +207,6 @@ html[data-theme="light"] .card span {
 html[data-theme="light"] .card div {
   color: #294532;
 }
-html[data-theme="light"] .connection-sparkline {
-  border-color: #c9dccf;
-  background: linear-gradient(180deg, #f3f8f4 0%, #edf5ef 100%);
-}
 html[data-theme="light"] .connection-speed-marker span {
   background: #f7fbf8dd;
   border-color: #a9c8b2;

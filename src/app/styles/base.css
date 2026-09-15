@@ -801,6 +801,7 @@ aside > .sidebar-foot {
 .connection {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 140px;
+  row-gap: 0;
   overflow: hidden;
 }
 .connection .primary {
@@ -819,9 +820,8 @@ aside > .sidebar-foot {
   grid-column: 1 / -1;
   width: calc(100% + 40px);
   height: 64px;
-  margin: 2px -20px -24px;
-  border-top: 1px solid #2e3d34;
-  background: linear-gradient(180deg, #17201b 0%, #151c18 100%);
+  margin: 0 -20px -24px;
+  background: transparent;
   pointer-events: none;
 }
 .connection-sparkline svg {

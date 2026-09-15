@@ -48,6 +48,7 @@ test("checks a signed manifest, downloads the archive and hands it to the instal
     privateKey,
   );
   let request = 0;
+  let manifestRequest;
   let installed;
   const manager = createAppUpdater({
     app: {
@@ -58,7 +59,13 @@ test("checks a signed manifest, downloads the archive and hands it to the instal
     platform: "darwin",
     architecture: "arm64",
     publicKey,
-    fetch: async () => response(request++ === 0 ? manifest : archive),
+    fetch: async (url, options) => {
+      if (request++ === 0) {
+        manifestRequest = { url, options };
+        return response(manifest);
+      }
+      return response(archive);
+    },
     installUpdate: async (update) => {
       installed = update;
     },
@@ -66,6 +73,10 @@ test("checks a signed manifest, downloads the archive and hands it to the instal
 
   await manager.check();
   assert.equal(manager.getState().status, "available");
+  const checkedUrl = new URL(manifestRequest.url);
+  assert.equal(checkedUrl.searchParams.get("current"), "1.2.3");
+  assert.match(checkedUrl.searchParams.get("check"), /^\d+$/);
+  assert.equal(manifestRequest.options.cache, "no-store");
   await manager.download();
   assert.equal(manager.getState().status, "downloaded");
   assert.equal(manager.getState().percent, 100);

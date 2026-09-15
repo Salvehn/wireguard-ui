@@ -145,7 +145,13 @@ function createAppUpdater({
       if (!state.supported) return Promise.resolve(snapshot());
       return run(async () => {
         update({ status: "checking", error: "" });
-        const response = await fetch(manifestUrl, {
+        const requestUrl = new URL(manifestUrl);
+        // GitHub can briefly cache the previous `releases/latest` redirect after
+        // publication. A unique query makes every manual check reach the current
+        // release instead of waiting for that CDN entry to expire.
+        requestUrl.searchParams.set("current", app.getVersion());
+        requestUrl.searchParams.set("check", Date.now().toString());
+        const response = await fetch(requestUrl.toString(), {
           cache: "no-store",
           redirect: "follow",
           headers: {

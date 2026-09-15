@@ -27,6 +27,7 @@ function linePath(values: number[]) {
 
 export function ConnectionSparkline({ profile }: { profile: Profile }) {
   const [values, setValues] = useState(() => Array(pointCount).fill(0));
+  const [hasSample, setHasSample] = useState(false);
   const previous = useRef<{ updatedAt: number; total: number } | null>(null);
   const stats = profile.stats;
 
@@ -34,9 +35,12 @@ export function ConnectionSparkline({ profile }: { profile: Profile }) {
     if (!profile.active || !stats) {
       previous.current = null;
       setValues(Array(pointCount).fill(0));
+      setHasSample(false);
       return;
     }
 
+    // WireGuard exposes cumulative byte counters. Sampling their delta measures
+    // throughput passively and never sends probe traffic through the tunnel.
     const total = stats.peers.reduce((sum, peer) => sum + peer.rx + peer.tx, 0);
     const last = previous.current;
     previous.current = { updatedAt: stats.updatedAt, total };
@@ -45,6 +49,7 @@ export function ConnectionSparkline({ profile }: { profile: Profile }) {
     const elapsed = (stats.updatedAt - last.updatedAt) / 1000;
     const rate = Math.max(0, total - last.total) / elapsed;
     setValues((current) => [...current.slice(1), rate]);
+    setHasSample(true);
   }, [profile.active, stats]);
 
   const line = useMemo(() => linePath(values), [values]);
@@ -69,14 +74,16 @@ export function ConnectionSparkline({ profile }: { profile: Profile }) {
         <path className="connection-sparkline-area" d={area} />
         <path className="connection-sparkline-line" d={line} />
       </svg>
-      <div
-        className={
-          "connection-speed-marker " + (currentY < 24 ? "below" : "above")
-        }
-        style={{ top: `${(currentY / height) * 100}%` }}
-      >
-        <span>{bytes(currentRate)}/s</span>
-      </div>
+      {hasSample && (
+        <div
+          className={
+            "connection-speed-marker " + (currentY < 24 ? "below" : "above")
+          }
+          style={{ top: `${(currentY / height) * 100}%` }}
+        >
+          <span>{bytes(currentRate)}/s</span>
+        </div>
+      )}
     </div>
   );
 }
