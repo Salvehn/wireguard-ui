@@ -64,7 +64,10 @@ const [nodeArchive, singBoxArchive, wireguardMsi] = await Promise.all(
 );
 const temporary = await fsp.mkdtemp(path.join(os.tmpdir(), "wg-desktop-win-"));
 try {
-  const expand = (archive, destination) =>
+  const powershellQuote = (value) =>
+    `'${String(value).replaceAll("'", "''")}'`;
+  const expand = (archive, destination) => {
+    const command = `Expand-Archive -LiteralPath ${powershellQuote(archive)} -DestinationPath ${powershellQuote(destination)} -Force`;
     execFileSync(
       path.join(
         process.env.SystemRoot || "C:\\Windows",
@@ -76,13 +79,12 @@ try {
       [
         "-NoProfile",
         "-NonInteractive",
-        "-Command",
-        "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-        archive,
-        destination,
+        "-EncodedCommand",
+        Buffer.from(command, "utf16le").toString("base64"),
       ],
       { stdio: "inherit" },
     );
+  };
   const nodeRoot = path.join(temporary, "node");
   const singBoxRoot = path.join(temporary, "sing-box");
   expand(nodeArchive, nodeRoot);
