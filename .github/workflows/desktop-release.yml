@@ -113,7 +113,7 @@ jobs:
             release/WireGuard-Desktop-x64-Setup.exe.blockmap
 
   sign:
-    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [macos, windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -155,7 +155,7 @@ jobs:
             release/update-windows-x64.json
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: sign
     runs-on: ubuntu-24.04
     timeout-minutes: 15

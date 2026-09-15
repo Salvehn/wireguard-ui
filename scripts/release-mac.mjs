@@ -106,6 +106,8 @@ if (existingTag)
     "desktop-release.yml",
     "--repo",
     repository,
+    "--ref",
+    tag,
     "-f",
     `tag=${tag}`,
   ]);
