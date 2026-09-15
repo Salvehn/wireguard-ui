@@ -9,7 +9,7 @@ const { hasWildcard, validateSettings } = require("./smart-tunneling.cjs");
 const { AppTunnels } = require("./app-tunnels.cjs");
 const { validateApps, enabled: appsEnabled } = require("./app-tunneling.cjs");
 const exec = promisify(execFile);
-const VERSION = 8;
+const VERSION = 9;
 const validId = (id) => typeof id === "string" && /^wg[a-f0-9]{10}$/.test(id);
 function validateRequest(request) {
   if (!request || typeof request !== "object" || Array.isArray(request))
@@ -168,7 +168,12 @@ function createCore({
       return {
         occupied,
         transportPaths: [path.join(bin, "wireguard-go")],
-        routes: occupied.filter((r) => interfaces[r.interfaceName]),
+        routes: occupied
+          .filter((r) => /^utun\d+$/.test(r.interfaceName))
+          .map((r) => ({
+            ...r,
+            external: !interfaces[r.interfaceName],
+          })),
         endpoints,
       };
     },

@@ -179,7 +179,16 @@ class AppTunnels {
     const environment = await this.environment();
     const config = compileGroup(
       sessions,
-      preflight ? { ...environment, occupied: [] } : environment,
+      preflight
+        ? {
+            ...environment,
+            occupied: [],
+            // A running application engine also owns an untracked utun.
+            // Ignore untracked interfaces until that engine has stopped and
+            // route discovery can distinguish it from third-party VPNs.
+            routes: environment.routes.filter((route) => !route.external),
+          }
+        : environment,
     );
     const binary = path.join(this.base, "bin/sing-box");
     await fs.access(binary);

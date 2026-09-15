@@ -22,7 +22,7 @@ Open **Smart tunneling** on a disconnected profile to choose what goes through t
 
 For a wildcard with an existing ordinary `/etc/resolver` file for the same domain, the helper forwards queries to that file’s DNS servers and restores the original file when disconnected. Other overlapping resolver rules still block connection. Exact domains covered by a wildcard also learn addresses from DNS queries, so a missing apex record does not prevent connection.
 
-Address-list modes use system DNS. In application mode, system DNS follows ordinary routes, shared system services may not be identified as part of an app, and WireGuard peer statistics are unavailable. Restart selected applications after connecting. Connection or domain-route changes briefly restart the shared application engine and may interrupt its traffic. Updating the system helper may require an administrator password.
+Address-list modes use system DNS. In application mode, system DNS follows ordinary routes, including routes from another macOS VPN, shared system services may not be identified as part of an app, and WireGuard peer statistics are unavailable. Restart selected applications after connecting. Connection or domain-route changes briefly restart the shared application engine and may interrupt its traffic. Updating the system helper may require an administrator password.
 
 Wildcard and application routing are experimental: automated checks pass, but live VPN integration has not yet been verified.
 

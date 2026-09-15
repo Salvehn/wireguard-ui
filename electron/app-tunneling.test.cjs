@@ -487,6 +487,49 @@ test("native and app tunnels coexist in both connection orders and disconnect in
   }
 });
 
+test("application routing preserves an untracked VPN and sends system DNS back to it", async (t) => {
+  const { createCore } = require("../helper/core.cjs");
+  const { engine, base, run } = await fixture(t);
+  const core = createCore({
+    base,
+    configDirectory: engine.configDirectory,
+    runtimeDirectory: path.join(base, "run"),
+    userId: 501,
+    run: async (file, args) => {
+      if (file.endsWith("/wg")) return { stdout: "" };
+      if (file === "/usr/sbin/netstat")
+        return {
+          stdout: args.includes("inet6")
+            ? "Destination Gateway Flags Netif Expire\n"
+            : "Destination Gateway Flags Netif Expire\n0/1 link#7 USc utun7\n128/1 link#7 USc utun7\n",
+        };
+      return run(file, args);
+    },
+  });
+  await core.handle({
+    op: "setActive",
+    id: "wg5555555555",
+    config,
+    active: true,
+    applications: settings,
+  });
+  const generated = JSON.parse(await fs.readFile(engine.config, "utf8"));
+  assert.ok(
+    generated.outbounds.some(
+      (outbound) =>
+        outbound.tag === "native-utun7" && outbound.bind_interface === "utun7",
+    ),
+  );
+  assert.equal(
+    routePacket(generated, {
+      address: "8.8.8.8",
+      processPath: "/usr/sbin/mDNSResponder",
+      port: 53,
+    }),
+    "native-utun7",
+  );
+});
+
 test("native changes wait for the old engine process to exit after launchd unregisters it", async (t) => {
   const { engine } = await fixture(t);
   await engine.start("wg1111111111", config, settings);
