@@ -1,6 +1,10 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs/promises');const os=require('node:os');const path=require('node:path');const net=require('node:net');
-const {validateRequest,sanitizedStats,createCore}=require('../helper/core.cjs');
+const {VERSION,validateRequest,sanitizedStats,createCore}=require('../helper/core.cjs');
+const {_test:macClient}=require('./helper-client-mac.cjs');
 const key='A'.repeat(43)+'=';const config=`[Interface]\nPrivateKey=${key}\nAddress=10.0.0.2/32\n[Peer]\nPublicKey=${key}\nAllowedIPs=10.0.0.0/24\n`;
+test('macOS app replaces an installed helper from the previous protocol version',()=>{
+ assert.equal(macClient.VERSION,VERSION);assert.equal(macClient.compatibleVersion({version:VERSION}),true);assert.equal(macClient.compatibleVersion({version:VERSION-1}),false);
+});
 test('privileged endpoint rejects shell hooks, arbitrary operations, paths and extra arguments',()=>{
  for(const op of ['shell','exec','__proto__','constructor'])assert.throws(()=>validateRequest({op}));
  assert.throws(()=>validateRequest({op:'setActive',id:'../../etc/hosts',active:true,config}));

@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const run = promisify(execFile);
-const VERSION = 10;
+const VERSION = 11;
 
 let identityFile = "";
 let identityPromise;
@@ -107,11 +107,12 @@ async function request(command, timeout = 130000) {
 }
 async function available() {
   try {
-    return (await request({ op: "ping" }, 2500)).version === VERSION;
+    return compatibleVersion(await request({ op: "ping" }, 2500));
   } catch {
     return false;
   }
 }
+const compatibleVersion = (result) => result?.version === VERSION;
 async function install(source) {
   const credentials = await identity();
   for (const file of [
@@ -153,5 +154,5 @@ module.exports = {
   available,
   install,
   configure,
-  _test: { psQuote, pipePath },
+  _test: { VERSION, compatibleVersion, psQuote, pipePath },
 };

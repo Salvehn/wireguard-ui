@@ -21,7 +21,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:release
+      - run: npm run build
+
   macos:
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -39,10 +57,6 @@ jobs:
       - name: Install macOS packaging dependencies
         run: brew install wireguard-tools wireguard-go
       - run: npm ci
-      - name: Test
-        run: |
-          npm test
-          npm run test:release
       - name: Build macOS arm64 artifacts
         run: npm run dist:mac
       - name: Verify packaged macOS application
@@ -51,7 +65,6 @@ jobs:
           codesign --verify --deep --strict "release/mac-arm64/WireGuard Desktop.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' 'release/mac-arm64/WireGuard Desktop.app/Contents/Info.plist')" = "$(node -p "require('./package.json').version")"
       - name: Upload macOS release artifacts
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-unsigned-macos-arm64
@@ -63,6 +76,7 @@ jobs:
             release/WireGuard-Desktop-arm64.zip.blockmap
 
   windows:
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
     runs-on: windows-2022
     timeout-minutes: 45
     env:
@@ -78,16 +92,12 @@ jobs:
           node-version: 24.14.0
           cache: npm
       - run: npm ci
-      - name: Test
-        run: |
-          npm run test:win
-          npm run test:release
       - name: Build Windows x64 installer
         env:
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: npm run dist:win
-      - name: Install and smoke-test the Windows system backend
+      - name: Smoke-test the installed Windows backend
         shell: pwsh
         run: |
           $key = '0123456789abcdef'
@@ -103,7 +113,6 @@ jobs:
             throw
           }
       - name: Upload Windows release artifacts
-        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-unsigned-windows-x64

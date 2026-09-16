@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const { VERSION } = require("../helper/core.cjs");
 const {
   createWindowsCore,
   avoidWindowsKillSwitch,
@@ -13,6 +14,8 @@ const key = "A".repeat(43) + "=";
 const config = `[Interface]\nPrivateKey=${key}\nAddress=10.0.0.2/32\n[Peer]\nPublicKey=${key}\nAllowedIPs=10.0.0.0/24\nEndpoint=198.51.100.2:51820\n`;
 
 test("Windows helper client quotes elevation arguments and isolates its pipe", () => {
+  assert.equal(client.VERSION, VERSION);
+  assert.equal(client.compatibleVersion({ version: VERSION - 1 }), false);
   assert.equal(client.psQuote("C:\\It's Here"), "'C:\\It''s Here'");
   assert.equal(
     client.pipePath("0123456789abcdef"),

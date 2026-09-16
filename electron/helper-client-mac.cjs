@@ -1,11 +1,12 @@
 const net = require("node:net");
 const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const { quote } = require("./config.cjs");
 const run = promisify(execFile);
-const VERSION = 10;
+const VERSION = 11;
 const socketPath = () =>
   `/var/run/wireguard-desktop-${process.getuid()}/helper.sock`;
 function request(command, timeout = 130000) {
@@ -45,11 +46,12 @@ function request(command, timeout = 130000) {
 }
 async function available() {
   try {
-    return (await request({ op: "ping" }, 2000)).version === VERSION;
+    return compatibleVersion(await request({ op: "ping" }, 2000));
   } catch {
     return false;
   }
 }
+const compatibleVersion = (result) => result?.version === VERSION;
 async function install(source) {
   const uid = process.getuid();
   const label = `local.wireguard.desktop.${uid}`;
@@ -57,12 +59,18 @@ async function install(source) {
   const plistPath = "/Library/LaunchDaemons/" + label + ".plist";
   await fs.access(path.join(source, "server.cjs"));
   await fs.access(path.join(source, "bin/node"));
+  const temporary = await fs.mkdtemp(
+    path.join(os.tmpdir(), "wireguard-desktop-helper-"),
+  );
+  const stagedSource = path.join(temporary, "helper");
+  await fs.cp(source, stagedSource, { recursive: true });
   const plist = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Label</key><string>${label}</string><key>ProgramArguments</key><array><string>${destination}/bin/node</string><string>--no-addons</string><string>--disable-proto=delete</string><string>${destination}/server.cjs</string><string>${uid}</string></array><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>AbandonProcessGroup</key><true/><key>ThrottleInterval</key><integer>5</integer><key>ProcessType</key><string>Background</string><key>EnvironmentVariables</key><dict><key>NODE_OPTIONS</key><string></string><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string></dict></dict></plist>`;
   const stage = destination + ".install";
   const command = `set -e
 /usr/bin/install -d -o root -g wheel -m 755 /Library/PrivilegedHelperTools /Library/LaunchDaemons
+/bin/rm -rf ${quote(stage)}
 /bin/mkdir -p ${quote(stage)}
-/usr/bin/ditto ${quote(source)} ${quote(stage)}
+/usr/bin/ditto ${quote(stagedSource)} ${quote(stage)}
 if [ -n "$(/usr/bin/find ${quote(stage)} -type l -print -quit)" ]; then exit 1; fi
 /usr/sbin/chown -R root:wheel ${quote(stage)}
 /bin/chmod -R go-w ${quote(stage)}
@@ -74,23 +82,33 @@ printf %s ${quote(plist)} > ${quote(plistPath)}
 /usr/sbin/chown root:wheel ${quote(plistPath)}
 /bin/chmod 644 ${quote(plistPath)}
 /bin/launchctl bootstrap system ${quote(plistPath)}`;
-  await run(
-    "/usr/bin/osascript",
-    [
-      "-e",
-      "do shell script " +
-        JSON.stringify("/bin/bash -c " + quote(command)) +
-        " with administrator privileges",
-    ],
-    { timeout: 180000, maxBuffer: 1024 * 1024 },
-  );
-  for (let i = 0; i < 20; i++) {
-    if (await available()) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+  try {
+    await run(
+      "/usr/bin/osascript",
+      [
+        "-e",
+        "do shell script " +
+          JSON.stringify("/bin/bash -c " + quote(command)) +
+          " with administrator privileges",
+      ],
+      { timeout: 180000, maxBuffer: 1024 * 1024 },
+    );
+    for (let i = 0; i < 20; i++) {
+      if (await available()) return;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw Error(
+      "Помощник установлен, но не запустился. Проверьте фоновые элементы macOS.",
+    );
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
   }
-  throw Error(
-    "Помощник установлен, но не запустился. Проверьте фоновые элементы macOS.",
-  );
 }
 function configure() {}
-module.exports = { request, available, install, configure };
+module.exports = {
+  request,
+  available,
+  install,
+  configure,
+  _test: { VERSION, compatibleVersion },
+};

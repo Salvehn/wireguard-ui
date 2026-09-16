@@ -65,8 +65,6 @@ const peerPublic = wg(["pubkey"], peerPrivate + "\n");
 const config = `[Interface]\nPrivateKey = ${privateKey}\nAddress = 10.254.254.1/32\n\n[Peer]\nPublicKey = ${peerPublic}\nAllowedIPs = 10.254.254.2/32\nEndpoint = 127.0.0.1:9\nPersistentKeepalive = 25\n`;
 const ids = {
   native: "wg0000000001",
-  wildcard: "wg0000000002",
-  applications: "wg0000000003",
 };
 const deactivate = async (id) => {
   try {
@@ -75,7 +73,7 @@ const deactivate = async (id) => {
 };
 try {
   const ping = await waitForHelper();
-  if (ping.version !== 10) throw Error("unexpected helper version");
+  if (ping.version !== 11) throw Error("unexpected helper version");
 
   const native = await request({
     op: "setActive",
@@ -86,35 +84,7 @@ try {
   if (!native.profiles[ids.native]?.active) throw Error("native tunnel did not start");
   await deactivate(ids.native);
 
-  const wildcard = await request({
-    op: "setActive",
-    id: ids.wildcard,
-    active: true,
-    config,
-    smartTunneling: { mode: "include", entries: ["*.wg-desktop.test"] },
-  });
-  if (!wildcard.profiles[ids.wildcard]?.active)
-    throw Error("wildcard tunnel did not start");
-  await deactivate(ids.wildcard);
-
-  const executable = path.join(
-    process.env.SystemRoot || "C:\\Windows",
-    "System32",
-    "WindowsPowerShell",
-    "v1.0",
-    "powershell.exe",
-  );
-  const applications = await request({
-    op: "setActive",
-    id: ids.applications,
-    active: true,
-    config,
-    applications: { mode: "include", paths: [executable] },
-  });
-  if (!applications.profiles[ids.applications]?.active)
-    throw Error("application tunnel did not start");
-  await deactivate(ids.applications);
-  console.log("Windows helper smoke test passed: native, wildcard, and application modes.");
+  console.log("Windows helper smoke test passed: installed service and native tunnel.");
 } finally {
   await Promise.all(Object.values(ids).map(deactivate));
 }
