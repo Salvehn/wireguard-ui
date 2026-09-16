@@ -21,6 +21,11 @@ async function verifyHelper(source, platform = process.platform) {
       timeout: 30000,
       stdio: 'pipe',
     });
+    if (platform === 'darwin') {
+      const bash = path.join(isolated, 'bin', 'bash');
+      execFileSync(bash, ['--noprofile', '--norc', '-c', '(( BASH_VERSINFO[0] >= 4 ))']);
+      execFileSync(bash, ['-n', path.join(isolated, 'bin', 'wg-quick')]);
+    }
     console.log('Packaged helper loads with isolated dependencies.');
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });

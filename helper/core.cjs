@@ -110,7 +110,7 @@ function createCore({
     WG_QUICK_USERSPACE_IMPLEMENTATION: path.join(bin, "wireguard-go"),
   };
   const command = (name, args) =>
-    run(name === "bash" ? "/bin/bash" : path.join(bin, name), args, {
+    run(path.join(bin, name), args, {
       env,
       timeout: 120000,
       maxBuffer: 1024 * 1024,
