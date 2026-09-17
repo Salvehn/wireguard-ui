@@ -86,13 +86,22 @@ try {
   const wireguardRoot = path.join(temporary, "wireguard");
   expand(nodeArchive, nodeRoot);
   expand(singBoxArchive, singBoxRoot);
-  const powershell = path.join(
+  const windowsPowershell = path.join(
     process.env.SystemRoot || "C:\\Windows",
     "System32",
     "WindowsPowerShell",
     "v1.0",
     "powershell.exe",
   );
+  const powerShell7 = path.join(
+    process.env.ProgramFiles || "C:\\Program Files",
+    "PowerShell",
+    "7",
+    "pwsh.exe",
+  );
+  const powershell = fs.existsSync(powerShell7)
+    ? powerShell7
+    : windowsPowershell;
   const psQuote = (value) => `'${String(value).replaceAll("'", "''")}'`;
   execFileSync(
     powershell,
@@ -100,7 +109,7 @@ try {
       "-NoProfile",
       "-NonInteractive",
       "-Command",
-      `$signature=Get-AuthenticodeSignature -LiteralPath ${psQuote(wireguardMsi)}; if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'WireGuard'){ throw 'WireGuard MSI signature is invalid' }`,
+      `Import-Module Microsoft.PowerShell.Security; $signature=Get-AuthenticodeSignature -LiteralPath ${psQuote(wireguardMsi)}; if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'WireGuard'){ throw 'WireGuard MSI signature is invalid' }`,
     ],
     { stdio: "inherit" },
   );
