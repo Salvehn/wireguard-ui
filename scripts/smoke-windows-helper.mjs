@@ -46,8 +46,11 @@ const waitForHelper = async () => {
   );
 };
 const wireguard = path.join(
-  process.env.ProgramFiles || "C:\\Program Files",
-  "WireGuard",
+  process.env.ProgramData || "C:\\ProgramData",
+  "WireGuardDesktop",
+  `Helper-${key}`,
+  "bin",
+  "wireguard",
   "wg.exe",
 );
 const wg = (args, input) => {
@@ -73,7 +76,7 @@ const deactivate = async (id) => {
 };
 try {
   const ping = await waitForHelper();
-  if (ping.version !== 11) throw Error("unexpected helper version");
+  if (ping.version !== 12) throw Error("unexpected helper version");
 
   const native = await request({
     op: "setActive",
@@ -81,10 +84,13 @@ try {
     active: true,
     config,
   });
-  if (!native.profiles[ids.native]?.active) throw Error("native tunnel did not start");
+  if (!native.profiles[ids.native]?.active)
+    throw Error("native tunnel did not start");
   await deactivate(ids.native);
 
-  console.log("Windows helper smoke test passed: installed service and native tunnel.");
+  console.log(
+    "Windows helper smoke test passed: installed service and native tunnel.",
+  );
 } finally {
   await Promise.all(Object.values(ids).map(deactivate));
 }

@@ -20,9 +20,9 @@ The macOS arm64 job:
 The Windows x64 job:
 
 1. Runs all tests and builds the renderer.
-2. Downloads pinned Node.js, sing-box, and official WireGuard artifacts and verifies their SHA-256 hashes.
-3. Compiles the LocalSystem helper host and builds the NSIS installer.
-4. Installs the helper and smoke-tests native, wildcard-domain, and application routing on Windows.
+2. Downloads pinned Node.js, sing-box, and official WireGuard artifacts, then verifies their SHA-256 hashes and the WireGuard Authenticode signature.
+3. Extracts the WireGuard runtime into the helper, compiles the LocalSystem host, and builds a standalone NSIS installer.
+4. Installs only the bundled helper and smoke-tests a native tunnel on Windows without a separate WireGuard client.
 5. Uploads the unsigned release files without access to the update-signing key.
 
 A protected Linux signing job downloads both artifact sets. GitHub pauses this job for approval by the repository owner, then exposes the update key only to the step that signs both manifests. A final Linux job verifies the manifests and all hashes, creates or resumes one draft, uploads exactly eight assets, publishes it as latest, and verifies both public update endpoints.

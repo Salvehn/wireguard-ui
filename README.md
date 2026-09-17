@@ -84,7 +84,7 @@ Open **Smart tunneling** on a disconnected profile and choose what should use th
 | macOS    | Apple Silicon    | [DMG](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-arm64.dmg)           |
 | Windows  | x64              | [Installer](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-x64-Setup.exe) |
 
-Import a standard WireGuard `.conf` file after installation. Setting up or upgrading the system helper requires administrator approval. The Windows installer includes the official signed WireGuard for Windows package.
+Import a standard WireGuard `.conf` file after installation. Setting up or upgrading the system helper requires administrator approval. The Windows build is standalone: its verified WireGuard runtime is bundled inside WireGuard Desktop, with no separate client installation.
 
 ## Development
 

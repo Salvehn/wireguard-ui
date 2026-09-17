@@ -84,7 +84,7 @@
 | macOS     | Apple Silicon          | [DMG](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-arm64.dmg)            |
 | Windows   | x64                    | [Установщик](https://github.com/Salvehn/wireguard-ui/releases/latest/download/WireGuard-Desktop-x64-Setup.exe) |
 
-После установки импортируйте обычный файл WireGuard `.conf`. Для установки или обновления системного помощника потребуется разрешение администратора. Windows-установщик включает официальный подписанный пакет WireGuard for Windows.
+После установки импортируйте обычный файл WireGuard `.conf`. Для установки или обновления системного помощника потребуется разрешение администратора. Windows-сборка автономна: проверенный WireGuard runtime входит в состав WireGuard Desktop, отдельный клиент устанавливать не нужно.
 
 ## Разработка
 

@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Key -notmatch '^[a-f0-9]{16}$' -or $Token -notmatch '^[a-f0-9]{64}$' -or $UserSid -notmatch '^S-1-(?:\d+-){2,14}\d+$') { throw 'Invalid helper identity' }
 $Source = [IO.Path]::GetFullPath($Source)
-foreach ($name in @('windows-server.cjs','bin\node.exe','bin\helper-host.exe','bin\sing-box.exe')) {
+foreach ($name in @('windows-server.cjs','bin\node.exe','bin\helper-host.exe','bin\sing-box.exe','bin\wireguard\wireguard.exe','bin\wireguard\wg.exe')) {
   if (-not (Test-Path -LiteralPath (Join-Path $Source $name) -PathType Leaf)) { throw "Missing helper file: $name" }
 }
 $service = "WireGuardDesktopHelper-$Key"
@@ -27,6 +27,20 @@ for ($i=0; $i -lt 40; $i++) {
   Start-Sleep -Milliseconds 250
 }
 if ($LASTEXITCODE -ne 1060) { throw 'Previous helper service is still being removed' }
+if (Test-Path -LiteralPath (Join-Path $destination 'tunnels') -PathType Container) {
+  Get-ChildItem -LiteralPath (Join-Path $destination 'tunnels') -Filter 'wg??????????.conf' -File -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.BaseName -match '^wg[a-f0-9]{10}$') {
+      $tunnelService = 'WireGuardTunnel$' + $_.BaseName
+      & sc.exe stop $tunnelService 2>$null | Out-Null
+      for ($i=0; $i -lt 40; $i++) {
+        $state = (& sc.exe query $tunnelService 2>$null | Out-String)
+        if ($state -notmatch 'STATE\s*:\s*\d+\s+STOP_PENDING') { break }
+        Start-Sleep -Milliseconds 250
+      }
+      & sc.exe delete $tunnelService 2>$null | Out-Null
+    }
+  }
+}
 Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item -Path (Join-Path $Source '*') -Destination $stage -Recurse -Force
@@ -38,15 +52,6 @@ New-Item -ItemType Directory -Path $root -Force | Out-Null
 Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction SilentlyContinue
 Move-Item -LiteralPath $stage -Destination $destination
 & icacls.exe $destination '/inheritance:r' '/grant:r' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
-$wireguard = Join-Path $env:ProgramFiles 'WireGuard\wireguard.exe'
-if (-not (Test-Path -LiteralPath $wireguard -PathType Leaf)) {
-  $msi = Join-Path $destination 'wireguard-amd64.msi'
-  if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw 'WireGuard for Windows is not installed and its signed installer is missing' }
-  $signature = Get-AuthenticodeSignature -LiteralPath $msi
-  if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'WireGuard') { throw 'WireGuard installer signature is invalid' }
-  $process = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\msiexec.exe') -Wait -PassThru -ArgumentList @('/qn','/i',$msi,'DO_NOT_LAUNCH=1')
-  if ($process.ExitCode -ne 0) { throw "WireGuard installation failed: $($process.ExitCode)" }
-}
 $hostPath = Join-Path $destination 'bin\helper-host.exe'
 $quotedHost = '"' + $hostPath + '"'
 & sc.exe create $service 'binPath=' $quotedHost 'start=' 'auto' 'obj=' 'LocalSystem' 'DisplayName=' "WireGuard Desktop Helper ($Key)" | Out-Null

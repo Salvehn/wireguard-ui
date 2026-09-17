@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const run = promisify(execFile);
-const VERSION = 11;
+const VERSION = 12;
 
 let identityFile = "";
 let identityPromise;
@@ -121,6 +121,8 @@ async function install(source) {
     "bin/node.exe",
     "bin/helper-host.exe",
     "bin/sing-box.exe",
+    "bin/wireguard/wireguard.exe",
+    "bin/wireguard/wg.exe",
   ])
     await fs.access(path.join(source, file));
   const powershell = path.join(

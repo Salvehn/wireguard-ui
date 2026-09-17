@@ -60,8 +60,7 @@ function createWindowsCore({
   appOptions = {},
 }) {
   const systemRoot = environment.SystemRoot || "C:\\Windows";
-  const programFiles = environment.ProgramFiles || "C:\\Program Files";
-  const wireguardDirectory = path.join(programFiles, "WireGuard");
+  const wireguardDirectory = path.join(base, "bin", "wireguard");
   const binaries = {
     wireguard: path.join(wireguardDirectory, "wireguard.exe"),
     wg: path.join(wireguardDirectory, "wg.exe"),
@@ -80,7 +79,6 @@ function createWindowsCore({
     windowsHide: true,
     env: {
       SystemRoot: systemRoot,
-      ProgramFiles: programFiles,
       PATH: environment.PATH || "",
       LANG: "C",
     },
@@ -193,7 +191,7 @@ function createWindowsCore({
         fs.access(binaries.wireguard),
         fs.access(binaries.wg),
       ]).catch(() => {
-        throw Error("WireGuard for Windows не установлен");
+        throw Error("Встроенный WireGuard backend повреждён");
       });
       await fs.mkdir(configDirectory, { recursive: true, mode: 0o700 });
       await applications.recover();

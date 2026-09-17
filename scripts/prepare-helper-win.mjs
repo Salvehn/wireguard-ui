@@ -62,6 +62,15 @@ async function download(dependency) {
 const [nodeArchive, singBoxArchive, wireguardMsi] = await Promise.all(
   dependencies.map(download),
 );
+async function filesUnder(directory) {
+  const found = [];
+  for (const entry of await fsp.readdir(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...(await filesUnder(target)));
+    else if (entry.isFile()) found.push(target);
+  }
+  return found;
+}
 const temporary = await fsp.mkdtemp(path.join(os.tmpdir(), "wg-desktop-win-"));
 try {
   const expand = (archive, destination) => {
@@ -74,8 +83,50 @@ try {
   };
   const nodeRoot = path.join(temporary, "node");
   const singBoxRoot = path.join(temporary, "sing-box");
+  const wireguardRoot = path.join(temporary, "wireguard");
   expand(nodeArchive, nodeRoot);
   expand(singBoxArchive, singBoxRoot);
+  const powershell = path.join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+  const psQuote = (value) => `'${String(value).replaceAll("'", "''")}'`;
+  execFileSync(
+    powershell,
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$signature=Get-AuthenticodeSignature -LiteralPath ${psQuote(wireguardMsi)}; if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'WireGuard'){ throw 'WireGuard MSI signature is invalid' }`,
+    ],
+    { stdio: "inherit" },
+  );
+  await fsp.mkdir(wireguardRoot, { recursive: true });
+  execFileSync(
+    path.join(
+      process.env.SystemRoot || "C:\\Windows",
+      "System32",
+      "msiexec.exe",
+    ),
+    ["/a", wireguardMsi, "/qn", `TARGETDIR=${wireguardRoot}`],
+    { stdio: "inherit" },
+  );
+  const extracted = await filesUnder(wireguardRoot);
+  const runtimeDirectory = extracted
+    .filter((file) => path.basename(file).toLowerCase() === "wireguard.exe")
+    .map(path.dirname)
+    .find((directory) =>
+      extracted.some(
+        (file) =>
+          path.dirname(file) === directory &&
+          path.basename(file).toLowerCase() === "wg.exe",
+      ),
+    );
+  if (!runtimeDirectory)
+    throw Error("WireGuard MSI does not contain wireguard.exe and wg.exe");
   await fsp.rm(base, { recursive: true, force: true });
   await fsp.mkdir(path.join(base, "bin"), { recursive: true });
   await fsp.mkdir(path.join(base, "licenses"), { recursive: true });
@@ -87,7 +138,11 @@ try {
     path.join(singBoxRoot, "sing-box-1.14.0-windows-amd64", "sing-box.exe"),
     path.join(base, "bin", "sing-box.exe"),
   );
-  await fsp.copyFile(wireguardMsi, path.join(base, "wireguard-amd64.msi"));
+  await fsp.cp(runtimeDirectory, path.join(base, "bin", "wireguard"), {
+    recursive: true,
+  });
+  for (const name of ["wireguard.exe", "wg.exe"])
+    await fsp.access(path.join(base, "bin", "wireguard", name));
   for (const name of [
     "windows-server.cjs",
     "windows-core.cjs",
@@ -152,7 +207,7 @@ try {
     [
       "Node.js 24.14.0: https://nodejs.org/dist/v24.14.0/",
       "sing-box 1.14.0: https://github.com/SagerNet/sing-box/tree/v1.14.0",
-      "WireGuard for Windows 1.1: https://download.wireguard.com/windows-client/",
+      "Embedded WireGuard for Windows 1.1 runtime: https://download.wireguard.com/windows-client/",
       "",
     ].join("\n"),
   );

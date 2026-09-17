@@ -25,6 +25,9 @@ async function verifyHelper(source, platform = process.platform) {
       const bash = path.join(isolated, 'bin', 'bash');
       execFileSync(bash, ['--noprofile', '--norc', '-c', '(( BASH_VERSINFO[0] >= 4 ))']);
       execFileSync(bash, ['-n', path.join(isolated, 'bin', 'wg-quick')]);
+    } else {
+      await fs.access(path.join(isolated, 'bin', 'wireguard', 'wireguard.exe'));
+      await fs.access(path.join(isolated, 'bin', 'wireguard', 'wg.exe'));
     }
     console.log('Packaged helper loads with isolated dependencies.');
   } finally {

@@ -6,7 +6,7 @@ const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const { quote } = require("./config.cjs");
 const run = promisify(execFile);
-const VERSION = 11;
+const VERSION = 12;
 const socketPath = () =>
   `/var/run/wireguard-desktop-${process.getuid()}/helper.sock`;
 function request(command, timeout = 130000) {

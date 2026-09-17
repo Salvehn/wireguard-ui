@@ -23,6 +23,16 @@ test("Windows helper client quotes elevation arguments and isolates its pipe", (
   );
 });
 
+test("Windows helper installation stays standalone", async () => {
+  const installer = await fs.readFile(
+    path.join(__dirname, "..", "windows", "install-helper.ps1"),
+    "utf8",
+  );
+  assert.doesNotMatch(installer, /ProgramFiles|msiexec|\/i.*\.msi/i);
+  assert.match(installer, /bin\\wireguard\\wireguard\.exe/);
+  assert.match(installer, /bin\\wireguard\\wg\.exe/);
+});
+
 test("Windows native configs avoid the WireGuard /0 firewall kill switch", () => {
   const transformed = avoidWindowsKillSwitch(
     "[Peer]\nAllowedIPs = 0.0.0.0/0, ::/0, 10.0.0.0/8 # routes",
@@ -35,9 +45,8 @@ test("Windows native configs avoid the WireGuard /0 firewall kill switch", () =>
 test("Windows helper installs, observes and removes a tunnel service", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "wg-win-helper-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const programFiles = path.join(root, "Program Files");
-  const wireguard = path.join(programFiles, "WireGuard");
   const base = path.join(root, "helper");
+  const wireguard = path.join(base, "bin", "wireguard");
   const tunnels = path.join(root, "tunnels");
   await Promise.all([
     fs.mkdir(wireguard, { recursive: true }),
@@ -76,7 +85,6 @@ test("Windows helper installs, observes and removes a tunnel service", async (t)
     configDirectory: tunnels,
     run,
     environment: {
-      ProgramFiles: programFiles,
       SystemRoot: path.join(root, "Windows"),
       PATH: "",
     },
@@ -107,5 +115,10 @@ test("Windows helper installs, observes and removes a tunnel service", async (t)
         call.file.endsWith("wireguard.exe") &&
         call.args[0] === "/uninstalltunnelservice",
     ),
+  );
+  assert.ok(
+    calls
+      .filter((call) => /(?:wireguard|wg)\.exe$/i.test(call.file))
+      .every((call) => call.file.startsWith(path.join(base, "bin"))),
   );
 });
