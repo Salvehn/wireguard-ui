@@ -28,7 +28,9 @@
   <img src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square&logo=windows11&logoColor=white" alt="Windows x64">
 </p>
 
-![WireGuard Desktop с вымышленными демонстрационными соединениями](docs/images/desktop-macos-window.png)
+<p align="center">
+  <img src="docs/images/desktop-macos-window.png" width="800" alt="WireGuard Desktop с вымышленными демонстрационными соединениями">
+</p>
 
 <p align="center"><sub>Все профили и данные трафика вымышлены. На скриншоте нет реальных подключений или приватных ключей.</sub></p>
 
