@@ -79,7 +79,7 @@ async function request(command, timeout = 130000) {
     };
     socket.setEncoding("utf8");
     socket.setTimeout(timeout, () =>
-      fail(Error("Системный помощник не ответил вовремя")),
+      fail(Error("Не удалось получить ответ от системы вовремя")),
     );
     socket.on("connect", () =>
       socket.write(
@@ -89,7 +89,7 @@ async function request(command, timeout = 130000) {
     socket.on("data", (chunk) => {
       result += chunk;
       if (result.length > 2 * 1024 * 1024)
-        fail(Error("Слишком большой ответ помощника"));
+        fail(Error("Слишком большой ответ системы"));
     });
     socket.on("error", fail);
     socket.on("end", () => {
@@ -98,7 +98,7 @@ async function request(command, timeout = 130000) {
         const data = JSON.parse(result);
         settled = true;
         if (data.ok) resolve(data.result);
-        else reject(Error(data.error || "Ошибка помощника"));
+        else reject(Error(data.error || "Ошибка управления VPN"));
       } catch (error) {
         fail(error);
       }

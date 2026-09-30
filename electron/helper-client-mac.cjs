@@ -22,13 +22,13 @@ function request(command, timeout = 130000) {
     };
     socket.setEncoding("utf8");
     socket.setTimeout(timeout, () =>
-      fail(Error("Системный помощник не ответил вовремя")),
+      fail(Error("Не удалось получить ответ от системы вовремя")),
     );
     socket.on("connect", () => socket.write(JSON.stringify(command) + "\n"));
     socket.on("data", (chunk) => {
       result += chunk;
       if (result.length > 2 * 1024 * 1024)
-        fail(Error("Слишком большой ответ помощника"));
+        fail(Error("Слишком большой ответ системы"));
     });
     socket.on("error", fail);
     socket.on("end", () => {
@@ -37,7 +37,7 @@ function request(command, timeout = 130000) {
         const data = JSON.parse(result);
         settled = true;
         if (data.ok) resolve(data.result);
-        else reject(Error(data.error || "Ошибка помощника"));
+        else reject(Error(data.error || "Ошибка управления VPN"));
       } catch (error) {
         fail(error);
       }
@@ -98,7 +98,7 @@ printf %s ${quote(plist)} > ${quote(plistPath)}
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     throw Error(
-      "Помощник установлен, но не запустился. Проверьте фоновые элементы macOS.",
+      "Системный доступ настроен, но недоступен. Проверьте фоновые элементы macOS.",
     );
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });

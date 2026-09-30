@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { tunnelApi } from "../api/tunnel-api";
+import { trafficHistory } from "./traffic-history";
 import type { State } from "./types";
 const initialState: State = {
   platform: "darwin",
@@ -17,6 +18,7 @@ export function useTunnels(interval = 2500) {
   const sequence = useRef(0);
   // Background snapshots update live DOM without capturing the whole window.
   const commit = useCallback((state: State) => {
+    trafficHistory.record(state.profiles);
     setData(state);
     setReady(true);
   }, []);

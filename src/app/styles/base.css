@@ -817,103 +817,81 @@ aside > .sidebar-foot {
   min-height: 28px;
 }
 .connection-sparkline {
-  position: relative;
   grid-column: 1 / -1;
-  width: calc(100% + 40px);
-  height: 24px;
-  margin: 0 -20px;
-  background: transparent;
-  overflow: hidden;
-  pointer-events: none;
-  transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid #8cb99b1c;
+  color: #90a699;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
-.connection-sparkline.visible {
-  height: 64px;
+.traffic-chart-heading,
+.traffic-chart-rates,
+.traffic-chart-axis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
-.connection-sparkline svg {
-  position: absolute;
-  inset: auto 0 0;
+.traffic-chart-heading > span {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+.traffic-chart-rates {
+  font:
+    11px/1.4 ui-monospace,
+    monospace;
+}
+.traffic-rx {
+  color: #9cddad;
+}
+.traffic-tx {
+  color: #8bb8e1;
+}
+.traffic-chart-plot {
+  position: relative;
+  height: 76px;
+  margin-top: 9px;
+}
+.traffic-chart-plot svg {
   display: block;
   width: 100%;
-  height: 64px;
-  opacity: 0;
-  transform: translateY(8px);
-  transition:
-    opacity 140ms ease,
-    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
-  shape-rendering: geometricPrecision;
+  height: 100%;
+  overflow: hidden;
 }
-.connection-sparkline.visible svg {
-  opacity: 1;
-  transform: translateY(0);
-}
-.connection-sparkline path {
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-.connection-sparkline svg.has-traffic path {
-  opacity: 1;
-}
-.connection-sparkline-area {
-  fill: url(#connection-area);
-}
-.connection-sparkline-line {
+.traffic-grid {
   fill: none;
-  stroke: url(#connection-line);
+  stroke: #90a69920;
+  stroke-width: 1;
+  stroke-dasharray: 3 6;
+  vector-effect: non-scaling-stroke;
+}
+.traffic-line {
+  fill: none;
+  stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 1px 2px #8bd2a547);
 }
-.connection-speed-marker {
+.traffic-chart-scale {
   position: absolute;
+  top: 0;
   right: 0;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  transition:
-    top 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 140ms ease;
+  font-size: 9px;
+  background: #1c251fe6;
+  padding-left: 5px;
 }
-.connection-sparkline.visible .connection-speed-marker {
-  opacity: 1;
-}
-.connection-sparkline.visible .connection-speed-marker.idle {
-  opacity: 0;
-}
-.connection-speed-marker::after {
-  content: "";
+.traffic-chart-message {
   position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #cff6d6;
-  box-shadow:
-    0 0 0 3px #8ed0a033,
-    0 0 8px #a9e8b6;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #1c251f66;
 }
-.connection-speed-marker span {
-  position: absolute;
-  right: 9px;
-  padding: 3px 6px;
-  border: 1px solid #4c6756;
-  border-radius: 5px;
-  background: #18211dcc;
-  color: #b9cfbf;
-  font:
-    9px/1.2 ui-monospace,
-    monospace;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  backdrop-filter: blur(4px);
-}
-.connection-speed-marker.above span {
-  bottom: 8px;
-}
-.connection-speed-marker.below span {
-  top: 8px;
+.traffic-chart-axis {
+  color: #83988b;
+  font-size: 9px;
 }
 .stats-heading > .icon {
   min-width: 176px;

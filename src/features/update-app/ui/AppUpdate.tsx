@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, ViewTransition } from "react";
 import { Check, Download, RefreshCw, RotateCcw, X } from "lucide-react";
 import { t, message } from "@/shared/lib/i18n";
+import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
 import {
   checkForUpdates,
@@ -17,7 +18,28 @@ function size(bytes: number) {
 export function AppUpdate({ platform }: { platform: "darwin" | "win32" }) {
   const state = useAppUpdate();
   const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
   const previousStatus = useRef(state.status);
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !container.current?.contains(event.target)
+      ) {
+        animate(() => setOpen(false));
+      }
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") animate(() => setOpen(false));
+    };
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [open]);
   useEffect(() => {
     if (
       previousStatus.current !== state.status &&
@@ -25,7 +47,7 @@ export function AppUpdate({ platform }: { platform: "darwin" | "win32" }) {
         state.status === "downloaded" ||
         state.status === "error")
     ) {
-      setOpen(true);
+      animate(() => setOpen(true));
     }
     previousStatus.current = state.status;
   }, [state.status]);
@@ -62,10 +84,10 @@ export function AppUpdate({ platform }: { platform: "darwin" | "win32" }) {
                   : t("Обновления приложения");
 
   return (
-    <div className="app-update">
+    <div className="app-update" ref={container}>
       <button
         className={`version-button ${available ? "update-available" : ""}`}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => animate(() => setOpen((value) => !value))}
         aria-expanded={open}
         aria-label={t("Версия {version}. Проверить обновления", {
           version: state.currentVersion,
@@ -85,74 +107,78 @@ export function AppUpdate({ platform }: { platform: "darwin" | "win32" }) {
         )}
       </button>
       {open && (
-        <section className="update-panel" aria-live="polite">
-          <div className="update-panel-heading">
-            <strong>{title}</strong>
-            <button
-              className="update-close"
-              aria-label={t("Закрыть")}
-              onClick={() => setOpen(false)}
-            >
-              <X size={14} />
-            </button>
-          </div>
-          {state.status === "downloading" && (
-            <>
-              <div
-                className="update-progress"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(state.percent)}
+        <ViewTransition enter="popover" exit="popover" update="panel">
+          <section className="update-panel" aria-live="polite">
+            <div className="update-panel-heading">
+              <strong>{title}</strong>
+              <button
+                className="update-close"
+                aria-label={t("Закрыть")}
+                onClick={() => animate(() => setOpen(false))}
               >
-                <span style={{ width: `${state.percent}%` }} />
-              </div>
-              <p className="update-metrics">
-                {Math.round(state.percent)}% · {size(state.transferred)} /{" "}
-                {size(state.total)}
-                {state.bytesPerSecond
-                  ? ` · ${size(state.bytesPerSecond)}/${t("с")}`
-                  : ""}
+                <X size={14} />
+              </button>
+            </div>
+            {state.status === "downloading" && (
+              <>
+                <div
+                  className="update-progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(state.percent)}
+                >
+                  <span style={{ width: `${state.percent}%` }} />
+                </div>
+                <p className="update-metrics">
+                  {Math.round(state.percent)}% · {size(state.transferred)} /{" "}
+                  {size(state.total)}
+                  {state.bytesPerSecond
+                    ? ` · ${size(state.bytesPerSecond)}/${t("с")}`
+                    : ""}
+                </p>
+              </>
+            )}
+            {state.status === "downloaded" && (
+              <p>
+                {t("Приложение отключит активные туннели и перезапустится.")}
               </p>
-            </>
-          )}
-          {state.status === "downloaded" && (
-            <p>{t("Приложение отключит активные туннели и перезапустится.")}</p>
-          )}
-          {state.status === "installing" && (
-            <p>{t("Отключаем активные туннели перед установкой.")}</p>
-          )}
-          {state.status === "error" && state.error && (
-            <p className="update-error">{message(state.error)}</p>
-          )}
-          {!state.supported && (
-            <p>
-              {t(
-                platform === "win32"
-                  ? "Проверка работает после установки приложения в Windows."
-                  : "Проверка работает после установки приложения из DMG.",
+            )}
+            {state.status === "installing" && (
+              <p>{t("Отключаем активные туннели перед установкой.")}</p>
+            )}
+            {state.status === "error" && state.error && (
+              <p className="update-error">{message(state.error)}</p>
+            )}
+            {!state.supported && (
+              <p>
+                {t(
+                  platform === "win32"
+                    ? "Проверка работает после установки приложения в Windows."
+                    : "Проверка работает после установки приложения из DMG.",
+                )}
+              </p>
+            )}
+            {state.supported &&
+              (state.status === "idle" ||
+                state.status === "up-to-date" ||
+                state.status === "error") && (
+                <button className="update-action" onClick={checkForUpdates}>
+                  <RefreshCw size={14} /> {t("Проверить обновления")}
+                </button>
               )}
-            </p>
-          )}
-          {state.supported &&
-            (state.status === "idle" ||
-              state.status === "up-to-date" ||
-              state.status === "error") && (
-              <button className="update-action" onClick={checkForUpdates}>
-                <RefreshCw size={14} /> {t("Проверить обновления")}
+            {state.status === "available" && (
+              <button className="update-action" onClick={downloadUpdate}>
+                <Download size={14} /> {t("Скачать обновление")}
               </button>
             )}
-          {state.status === "available" && (
-            <button className="update-action" onClick={downloadUpdate}>
-              <Download size={14} /> {t("Скачать обновление")}
-            </button>
-          )}
-          {state.status === "downloaded" && (
-            <button className="update-action primary" onClick={installUpdate}>
-              <RotateCcw size={14} /> {t("Перезапустить и установить")}
-            </button>
-          )}
-        </section>
+            {state.status === "downloaded" && (
+              <button className="update-action primary" onClick={installUpdate}>
+                <RotateCcw size={14} /> {t("Перезапустить и установить")}
+              </button>
+            )}
+          </section>
+        </ViewTransition>
       )}
     </div>
   );

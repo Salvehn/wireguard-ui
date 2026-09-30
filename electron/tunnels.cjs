@@ -34,7 +34,7 @@ class TunnelController {
       if (!profile.statusUnknown && profile.active === active) return;
       this.pending.set(id, active ? 'connecting' : 'disconnecting');
       if (active) for (const note of routeNotes(profile, all, this.platform)) this.log(`${profile.name}: ${note}`);
-      this.log(`${profile.name}: ${active ? 'подключение' : 'отключение'}, выполняется системным помощником`);
+      this.log(`${profile.name}: ${active ? 'подключение VPN' : 'отключение VPN'}`);
       const output = await this.execute(profile, active ? 'up' : 'down');
       this.log(`${profile.name}: ${output || 'операция завершена'}`);
     }).catch(error => { this.log(error.stderr || error.message); throw error; })

@@ -1,7 +1,7 @@
 import { t, message } from "@/shared/lib/i18n";
 import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
-import { useEffect, useState } from "react";
+import { useEffect, useState, ViewTransition } from "react";
 import { X } from "lucide-react";
 import { tunnelApi, type Profile, type State } from "@/entities/tunnel";
 export function ConfigEditor({
@@ -63,82 +63,86 @@ export function ConfigEditor({
     }
   }
   return (
-    <div className="modal-backdrop">
-      <section
-        className="config-editor"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("Редактор конфигурации")}
-      >
-        <div className="editor-heading">
-          <div>
-            <h2>{t("Конфигурация")}</h2>
-            <p>{profile.name}</p>
-          </div>
-          <button
-            className="icon"
-            aria-label={t("Закрыть редактор")}
-            onClick={dismiss}
+    <ViewTransition enter="backdrop" exit="backdrop" update="none">
+      <div className="modal-backdrop">
+        <ViewTransition enter="modal" exit="modal" update="panel">
+          <section
+            className="config-editor"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("Редактор конфигурации")}
           >
-            <X size={18} />
-          </button>
-        </div>
-        <p className="editor-note">
-          {t(
-            "Ключи скрыты маркерами <UNCHANGED_KEY_…>. Оставьте их для сохранения текущих ключей или вставьте новые.",
-          )}
-        </p>
-        {profile.active && (
-          <p className="editor-note">
-            {t("Для сохранения сначала отключите этот туннель.")}
-          </p>
-        )}
-        {error && (
-          <div className="error" role="alert">
-            {message(error)}
-          </div>
-        )}
-        <textarea
-          aria-label={t("Конфигурация WireGuard")}
-          autoFocus
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          disabled={!revision || saving}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <div className="editor-actions">
-          {discard ? (
-            <>
-              <span>{t("Отменить несохранённые изменения?")}</span>
+            <div className="editor-heading">
+              <div>
+                <h2>{t("Конфигурация")}</h2>
+                <p>{profile.name}</p>
+              </div>
               <button
                 className="icon"
-                onClick={() => animate(() => setDiscard(false))}
+                aria-label={t("Закрыть редактор")}
+                onClick={dismiss}
               >
-                {t("Продолжить")}
+                <X size={18} />
               </button>
-              <button className="icon" onClick={close}>
-                {t("Отменить изменения")}
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="icon" onClick={dismiss}>
-                {t("Отмена")}
-              </button>
-              <button
-                className="primary"
-                disabled={!revision || saving || text === original}
-                onClick={save}
-              >
-                {saving && <Spinner />}
-                {saving ? t("Сохранение…") : t("Сохранить")}
-              </button>
-            </>
-          )}
-        </div>
-      </section>
-    </div>
+            </div>
+            <p className="editor-note">
+              {t(
+                "Ключи скрыты маркерами <UNCHANGED_KEY_…>. Оставьте их для сохранения текущих ключей или вставьте новые.",
+              )}
+            </p>
+            {profile.active && (
+              <p className="editor-note">
+                {t("Для сохранения сначала отключите этот туннель.")}
+              </p>
+            )}
+            {error && (
+              <div className="error" role="alert">
+                {message(error)}
+              </div>
+            )}
+            <textarea
+              aria-label={t("Конфигурация WireGuard")}
+              autoFocus
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              disabled={!revision || saving}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <div className="editor-actions">
+              {discard ? (
+                <>
+                  <span>{t("Отменить несохранённые изменения?")}</span>
+                  <button
+                    className="icon"
+                    onClick={() => animate(() => setDiscard(false))}
+                  >
+                    {t("Продолжить")}
+                  </button>
+                  <button className="icon" onClick={close}>
+                    {t("Отменить изменения")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="icon" onClick={dismiss}>
+                    {t("Отмена")}
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={!revision || saving || text === original}
+                    onClick={save}
+                  >
+                    {saving && <Spinner />}
+                    {saving ? t("Сохранение…") : t("Сохранить")}
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+        </ViewTransition>
+      </div>
+    </ViewTransition>
   );
 }

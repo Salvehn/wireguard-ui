@@ -207,16 +207,27 @@ html[data-theme="light"] .card span {
 html[data-theme="light"] .card div {
   color: #294532;
 }
-html[data-theme="light"] .connection-speed-marker span {
-  background: #f7fbf8dd;
-  border-color: #a9c8b2;
-  color: #476651;
+html[data-theme="light"] .connection-sparkline {
+  color: #54705e;
+  border-color: #496e5926;
 }
-html[data-theme="light"] .connection-speed-marker::after {
-  background: #4e9465;
-  box-shadow:
-    0 0 0 3px #6db18233,
-    0 0 7px #71b787;
+html[data-theme="light"] .traffic-rx {
+  color: #34794d;
+}
+html[data-theme="light"] .traffic-tx {
+  color: #447cac;
+}
+html[data-theme="light"] .traffic-grid {
+  stroke: #54705e26;
+}
+html[data-theme="light"] .traffic-chart-scale {
+  background: #eff5f0e6;
+}
+html[data-theme="light"] .traffic-chart-message {
+  background: #eff5f080;
+}
+html[data-theme="light"] .traffic-chart-axis {
+  color: #5b7664;
 }
 html[data-theme="light"] .active-chips button {
   background: #d4e6d9;
@@ -350,28 +361,6 @@ html[data-theme="light"] nav,
 html[data-theme="light"] .log {
   color-scheme: light;
 }
-.helper-notice {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid #536b5b;
-  background: #23322a;
-  border-radius: 10px;
-  margin-bottom: 18px;
-}
-.helper-notice > div {
-  flex: 1;
-}
-.helper-notice p {
-  font-size: 11px;
-  margin-top: 6px;
-}
-html[data-theme="light"] .helper-notice {
-  background: #e2eee6;
-  border-color: #b3cebd;
-}
-
 html[data-theme="light"] .smart-summary,
 html[data-theme="light"] .smart-dialog {
   background: #f5f8f6;

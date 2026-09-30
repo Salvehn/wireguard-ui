@@ -118,7 +118,7 @@ async function applySmartTunneling(
   if (settings.mode === "off") return config;
   const dynamic = hasWildcard(settings);
   if (dynamic && !allowDynamic)
-    throw Error("Маски требуют обновления системного помощника");
+    throw Error("Для масок требуется обновить системный доступ к VPN");
   const rules = await resolveEntries(
     [
       ...settings.entries.filter(

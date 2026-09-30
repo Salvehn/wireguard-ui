@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { animate } from "@/shared/lib/view-transition";
 import english from "./en.json";
 
@@ -26,20 +26,22 @@ function apply(next: LocaleSettings) {
   const update = () => {
     settings = next;
     ready = true;
-    document.documentElement.lang = next.language;
     notify();
   };
   if (ready && changed) animate(update, "language");
   else update();
 }
 export function useLocale() {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    () => snapshot,
-  );
+  const [current, setCurrent] = useState(snapshot);
+  useEffect(() => {
+    const listener = () => setCurrent(snapshot);
+    listeners.add(listener);
+    listener();
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+  return current;
 }
 export function getLanguage() {
   return settings.language;

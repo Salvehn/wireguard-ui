@@ -186,7 +186,7 @@ test("wildcards match every subdomain level but never apex or a suffix lookalike
 });
 test("wildcard-only include starts with no routes and learns addresses without widening base routes", async () => {
   const rule = settings("include", ["*.example.com"]);
-  await assert.rejects(applySmartTunneling(config, rule), /помощника/);
+  await assert.rejects(applySmartTunneling(config, rule), /системный доступ/);
   const initial = await applySmartTunneling(config, rule, undefined, {
     allowDynamic: true,
   });

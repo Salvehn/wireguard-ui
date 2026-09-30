@@ -1,3 +1,4 @@
+import { ViewTransition } from "react";
 import { t, message } from "@/shared/lib/i18n";
 import { animate } from "@/shared/lib/view-transition";
 import { Spinner } from "@/shared/ui/spinner";
@@ -44,7 +45,6 @@ export function WorkspacePage() {
         data={data}
         profile={profile}
         pending={pending}
-        ready={ready}
         busy={busy}
         select={(id) => animate(() => select(id))}
         onImport={() => perform(tunnelApi.import)}
@@ -55,76 +55,93 @@ export function WorkspacePage() {
           <div className="header-actions">
             <ThemeSwitcher />
             <LanguageSwitcher />
-            <button
-              className="local connections-trigger"
-              popoverTarget="active-connections"
-              aria-expanded={connectionsOpen}
-              aria-controls="active-connections"
-            >
-              <i className={activeProfiles.length ? "online" : ""} />
-              {t("Активно:")} {activeProfiles.length} / {data.profiles.length}
-              <ChevronDown size={13} />
-            </button>
-            <div
-              id="active-connections"
-              className="connections-popover"
-              popover="auto"
-              ref={connectionsPopover}
-              onToggle={(event) =>
-                setConnectionsOpen(event.newState === "open")
-              }
-              role="region"
-              aria-label={t("Активные соединения")}
-            >
-              <strong>{t("Активные соединения")}</strong>
-              {activeProfiles.length ? (
-                <div className="connections-list">
-                  {activeProfiles.map((p) => (
-                    <div className="connection-row" key={p.id}>
-                      <button
-                        className="connection-select"
-                        aria-current={p.id === profile?.id ? "true" : undefined}
-                        onClick={() => {
-                          connectionsPopover.current?.hidePopover();
-                          if (p.id !== profile?.id) animate(() => select(p.id));
-                        }}
-                      >
-                        <i className="online" />
-                        <span>{p.name}</span>
-                        <ArrowUpRight size={14} />
-                      </button>
-                      <button
-                        className={"tray-switch " + (p.active ? "on" : "")}
-                        role="switch"
-                        aria-checked={p.active}
-                        aria-label={
-                          (p.active ? t("Отключить ") : t("Подключить ")) +
-                          p.name
-                        }
-                        aria-busy={
-                          !!data.operations[p.id] || pending.includes(p.id)
-                        }
-                        disabled={
-                          !!data.operations[p.id] ||
-                          pending.includes(p.id) ||
-                          !data.backend
-                        }
-                        onClick={() =>
-                          perform(
-                            () => tunnelApi.setActive(p.id, !p.active),
-                            p.id,
-                          )
-                        }
-                      >
-                        <span />
-                      </button>
+            <ViewTransition update="panel">
+              <button
+                className="local connections-trigger"
+                popoverTarget="active-connections"
+                aria-expanded={connectionsOpen}
+                aria-controls="active-connections"
+              >
+                <i className={activeProfiles.length ? "online" : ""} />
+                {t("Активно:")} {activeProfiles.length} / {data.profiles.length}
+                <ChevronDown size={13} />
+              </button>
+            </ViewTransition>
+            <ViewTransition update="panel">
+              <div
+                id="active-connections"
+                className="connections-popover"
+                popover="auto"
+                ref={connectionsPopover}
+                onToggle={(event) =>
+                  setConnectionsOpen(event.newState === "open")
+                }
+                role="region"
+                aria-label={t("Активные соединения")}
+              >
+                <strong>{t("Активные соединения")}</strong>
+                {activeProfiles.length ? (
+                  <ViewTransition update="panel">
+                    <div className="connections-list">
+                      {activeProfiles.map((p) => (
+                        <ViewTransition key={p.id} update="panel">
+                          <div className="connection-row">
+                            <ViewTransition update="panel">
+                              <button
+                                className="connection-select"
+                                aria-current={
+                                  p.id === profile?.id ? "true" : undefined
+                                }
+                                onClick={() => {
+                                  connectionsPopover.current?.hidePopover();
+                                  if (p.id !== profile?.id)
+                                    animate(() => select(p.id));
+                                }}
+                              >
+                                <i className="online" />
+                                <span>{p.name}</span>
+                                <ArrowUpRight size={14} />
+                              </button>
+                            </ViewTransition>
+                            <button
+                              className={
+                                "tray-switch " + (p.active ? "on" : "")
+                              }
+                              role="switch"
+                              aria-checked={p.active}
+                              aria-label={
+                                (p.active
+                                  ? t("Отключить ")
+                                  : t("Подключить ")) + p.name
+                              }
+                              aria-busy={
+                                !!data.operations[p.id] ||
+                                pending.includes(p.id)
+                              }
+                              disabled={
+                                !!data.operations[p.id] ||
+                                pending.includes(p.id) ||
+                                !data.backend
+                              }
+                              onClick={() =>
+                                perform(
+                                  () => tunnelApi.setActive(p.id, !p.active),
+                                  p.id,
+                                )
+                              }
+                            >
+                              <span />
+                            </button>
+                          </div>
+                        </ViewTransition>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p>{t("Нет активных туннелей")}</p>
-              )}
-            </div>
+                  </ViewTransition>
+                ) : (
+                  <p>{t("Нет активных туннелей")}</p>
+                )}
+              </div>
+            </ViewTransition>
           </div>
         </header>
         {error && (
@@ -133,121 +150,115 @@ export function WorkspacePage() {
             <button onClick={() => animate(() => setError(""))}>×</button>
           </div>
         )}
-        {ready && data.helper.status !== "ready" && (
-          <div className="helper-notice" role="status">
-            <div>
-              <strong>
-                {data.helper.status === "installing"
-                  ? t("Настройка системного доступа…")
-                  : t("Нужен системный помощник")}
-              </strong>
-              <p>
-                {message(data.helper.message) ||
-                  t(
-                    "Один запрос администратора при установке. Затем VPN работает без повторного ввода пароля.",
-                  )}
-              </p>
-            </div>
-            <button
-              className="primary"
-              disabled={
-                data.helper.status === "installing" ||
-                pending.includes("helper")
-              }
-              onClick={() => perform(tunnelApi.setupHelper, "helper")}
-            >
-              {data.helper.status === "installing" ? (
-                <Spinner />
-              ) : (
-                t("Настроить доступ")
-              )}
-            </button>
-          </div>
-        )}
         {profile ? (
           <Fragment key={profile.id}>
-            <div className="title">
-              <div>
-                <h1>{profile.name}</h1>
-                <p>{t("Ваше соединение. Под вашим контролем.")}</p>
+            <ViewTransition update="panel">
+              <div className="title">
+                <div>
+                  <h1>{profile.name}</h1>
+                  <p>{t("Ваше соединение. Под вашим контролем.")}</p>
+                </div>
+                <ViewTransition update="panel">
+                  <div className="title-actions">
+                    <button
+                      className="icon"
+                      disabled={!!operation}
+                      onClick={() => animate(() => setEditor(profile))}
+                    >
+                      <Pencil size={16} />
+                      {t("Редактировать")}
+                    </button>
+                    <button
+                      aria-label={t("Удалить туннель")}
+                      className="icon"
+                      disabled={
+                        !!operation || profile.active || profile.statusUnknown
+                      }
+                      onClick={() =>
+                        perform(() => tunnelApi.remove(profile.id), profile.id)
+                      }
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </ViewTransition>
               </div>
-              <div className="title-actions">
-                <button
-                  className="icon"
-                  disabled={!!operation}
-                  onClick={() => animate(() => setEditor(profile))}
-                >
-                  <Pencil size={16} />
-                  {t("Редактировать")}
-                </button>
-                <button
-                  aria-label={t("Удалить туннель")}
-                  className="icon"
-                  disabled={
-                    !!operation || profile.active || profile.statusUnknown
-                  }
-                  onClick={() =>
-                    perform(() => tunnelApi.remove(profile.id), profile.id)
-                  }
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-            <section
-              className={"connection " + (profile.active ? "connected" : "")}
-            >
-              <div className="shield">
-                <BrandIcon size={64} />
-              </div>
-              <div>
-                <div className="eyebrow">{t("СОСТОЯНИЕ ТУННЕЛЯ")}</div>
-                <h2>
-                  {operation
-                    ? operation.startsWith("queued")
-                      ? t("В очереди…")
-                      : t("Выполняется операция…")
-                    : profile.statusUnknown
-                      ? t("Нужно проверить состояние")
-                      : profile.active
-                        ? t("Интерфейс активен")
-                        : t("Готов к подключению")}
-                </h2>
-                <p>
-                  {profile.statusUnknown
-                    ? t(
-                        "Обнаружен системный туннель. Обновите его состояние через помощник.",
-                      )
-                    : profile.active
-                      ? t("Туннель поднят. Доступность сервера не проверена.")
-                      : t("Подключитесь, когда нужен защищённый маршрут.")}
-                </p>
-              </div>
-              <button
-                className="primary"
-                disabled={!!operation || !data.backend}
-                aria-busy={!!operation}
-                onClick={() =>
-                  perform(
-                    () =>
-                      profile.statusUnknown
-                        ? tunnelApi.refreshStats()
-                        : tunnelApi.setActive(profile.id, !profile.active),
-                    profile.id,
-                  )
-                }
+            </ViewTransition>
+            <ViewTransition update="panel">
+              <section
+                className={"connection " + (profile.active ? "connected" : "")}
               >
-                {operation ? <Spinner /> : <Power size={16} />}
-                {operation
-                  ? t("Ожидайте…")
-                  : profile.statusUnknown
-                    ? t("Проверить")
-                    : profile.active
-                      ? t("Отключить")
-                      : t("Подключить")}
-              </button>
-              <ConnectionSparkline profile={profile} />
-            </section>
+                <div className="shield">
+                  <BrandIcon size={64} />
+                </div>
+                <div>
+                  <div className="eyebrow">{t("СОСТОЯНИЕ ТУННЕЛЯ")}</div>
+                  <h2>
+                    {operation
+                      ? operation.startsWith("queued")
+                        ? t("В очереди…")
+                        : t("Выполняется операция…")
+                      : profile.statusUnknown
+                        ? t("Нужно проверить состояние")
+                        : profile.active
+                          ? t("Интерфейс активен")
+                          : t("Готов к подключению")}
+                  </h2>
+                  <p>
+                    {!data.backend
+                      ? message(data.helper.message) ||
+                        t(
+                          "При первом подключении система запросит разрешение на управление VPN.",
+                        )
+                      : profile.statusUnknown
+                        ? t(
+                            "Состояние VPN пока неизвестно. Обновите его перед управлением соединением.",
+                          )
+                        : profile.active
+                          ? t(
+                              "Туннель поднят. Доступность сервера не проверена.",
+                            )
+                          : t("Подключитесь, когда нужен защищённый маршрут.")}
+                  </p>
+                </div>
+                <button
+                  className="primary"
+                  disabled={!!operation || data.helper.status === "installing"}
+                  aria-busy={!!operation || data.helper.status === "installing"}
+                  onClick={() =>
+                    perform(async () => {
+                      if (!data.backend) {
+                        const state = await tunnelApi.setupHelper();
+                        if (state.helper.status !== "ready") return state;
+                      }
+                      return profile.statusUnknown
+                        ? tunnelApi.refreshStats()
+                        : tunnelApi.setActive(profile.id, !profile.active);
+                    }, profile.id)
+                  }
+                >
+                  {operation || data.helper.status === "installing" ? (
+                    <Spinner />
+                  ) : (
+                    <Power size={16} />
+                  )}
+                  {operation || data.helper.status === "installing"
+                    ? t("Ожидайте…")
+                    : !data.backend
+                      ? t(
+                          data.helper.status === "error"
+                            ? "Восстановить доступ"
+                            : "Разрешить управление VPN",
+                        )
+                      : profile.statusUnknown
+                        ? t("Проверить")
+                        : profile.active
+                          ? t("Отключить")
+                          : t("Подключить")}
+                </button>
+                <ConnectionSparkline profile={profile} />
+              </section>
+            </ViewTransition>
             {profile.notes.length > 0 && (
               <div className="route-notes">
                 {profile.notes.map((note, i) => (
@@ -261,12 +272,14 @@ export function WorkspacePage() {
               pending={!!operation}
               saved={setData}
             />
-            <div className="details">
-              <Card label={t("АДРЕС ТУННЕЛЯ")} value={profile.address} />
-              <Card label="DNS" value={profile.dns} />
-              <Card label="ENDPOINT" value={profile.endpoint} />
-              <Card label={t("МАРШРУТЫ")} value={profile.allowedIPs} />
-            </div>
+            <ViewTransition update="panel">
+              <div className="details">
+                <Card label={t("АДРЕС ТУННЕЛЯ")} value={profile.address} />
+                <Card label="DNS" value={profile.dns} />
+                <Card label="ENDPOINT" value={profile.endpoint} />
+                <Card label={t("МАРШРУТЫ")} value={profile.allowedIPs} />
+              </div>
+            </ViewTransition>
             <StatsPanel
               profile={profile}
               pending={data.statsBusy || pending.includes("stats")}
