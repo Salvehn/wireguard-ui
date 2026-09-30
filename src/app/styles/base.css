@@ -817,54 +817,38 @@ aside > .sidebar-foot {
   min-height: 28px;
 }
 .connection-sparkline {
+  position: relative;
   grid-column: 1 / -1;
   min-width: 0;
-  padding-top: 14px;
-  border-top: 1px solid #8cb99b1c;
-  color: #90a699;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
+  width: calc(100% + 40px);
+  height: 64px;
+  margin: 0 -20px;
+  overflow: hidden;
+  pointer-events: none;
 }
-.traffic-chart-heading,
-.traffic-chart-rates,
-.traffic-chart-axis {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.traffic-chart-heading > span {
-  font-size: 9px;
-  letter-spacing: 1.5px;
+.connection-sparkline svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 .traffic-chart-rates {
+  position: absolute;
+  top: 2px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font:
-    11px/1.4 ui-monospace,
+    9px/1.4 ui-monospace,
     monospace;
+  font-variant-numeric: tabular-nums;
 }
 .traffic-rx {
   color: #9cddad;
 }
 .traffic-tx {
   color: #8bb8e1;
-}
-.traffic-chart-plot {
-  position: relative;
-  height: 76px;
-  margin-top: 9px;
-}
-.traffic-chart-plot svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-.traffic-grid {
-  fill: none;
-  stroke: #90a69920;
-  stroke-width: 1;
-  stroke-dasharray: 3 6;
-  vector-effect: non-scaling-stroke;
 }
 .traffic-line {
   fill: none;
@@ -873,25 +857,6 @@ aside > .sidebar-foot {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-}
-.traffic-chart-scale {
-  position: absolute;
-  top: 0;
-  right: 0;
-  font-size: 9px;
-  background: #1c251fe6;
-  padding-left: 5px;
-}
-.traffic-chart-message {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: #1c251f66;
-}
-.traffic-chart-axis {
-  color: #83988b;
-  font-size: 9px;
 }
 .stats-heading > .icon {
   min-width: 176px;

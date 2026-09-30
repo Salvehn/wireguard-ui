@@ -207,27 +207,11 @@ html[data-theme="light"] .card span {
 html[data-theme="light"] .card div {
   color: #294532;
 }
-html[data-theme="light"] .connection-sparkline {
-  color: #54705e;
-  border-color: #496e5926;
-}
 html[data-theme="light"] .traffic-rx {
   color: #34794d;
 }
 html[data-theme="light"] .traffic-tx {
   color: #447cac;
-}
-html[data-theme="light"] .traffic-grid {
-  stroke: #54705e26;
-}
-html[data-theme="light"] .traffic-chart-scale {
-  background: #eff5f0e6;
-}
-html[data-theme="light"] .traffic-chart-message {
-  background: #eff5f080;
-}
-html[data-theme="light"] .traffic-chart-axis {
-  color: #5b7664;
 }
 html[data-theme="light"] .active-chips button {
   background: #d4e6d9;

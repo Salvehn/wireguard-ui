@@ -142,3 +142,55 @@ test("malformed counters never produce non-finite speeds", () => {
   history.record([profile("a", NaN, 0, 0)]);
   assert.equal(history.read("a", 6000).current, null);
 });
+
+test("new measurements grow smoothly while the time window slides independently", () => {
+  const samples = [
+    { start: 50000, time: 52500, rx: 0, tx: 0 },
+    { start: 52500, time: 55000, rx: 2048, tx: 0 },
+  ];
+  const entering = trafficPaths(samples, 60000, 2048, "rx", 0.5);
+  assert.ok(
+    entering.line.endsWith("895.8333333333334 36"),
+    "the new point is halfway through its interval and amplitude",
+  );
+  const before = trafficPaths(samples, 60000, 2048, "rx");
+  const after = trafficPaths(samples, 60600, 2048, "rx");
+  assert.notEqual(
+    before.line,
+    after.line,
+    "time slides without requiring a new sample",
+  );
+  assert.deepEqual(
+    samples[1],
+    { start: 52500, time: 55000, rx: 2048, tx: 0 },
+    "visual interpolation does not modify measurements",
+  );
+});
+
+test("both live lines meet the right edge without joining older gaps or changing history", () => {
+  const samples = [
+    { start: 45000, time: 47500, rx: 1024, tx: 512 },
+    { start: 55000, time: 57500, rx: 2048, tx: 256 },
+  ];
+  for (const direction of ["rx", "tx"]) {
+    for (const progress of [0, 0.5, 1]) {
+      const live = trafficPaths(
+        samples,
+        60000,
+        4096,
+        direction,
+        progress,
+        true,
+      );
+      assert.ok(live.line.endsWith("H 1000"));
+      assert.equal((live.line.match(/H 1000/g) || []).length, 1);
+      assert.equal((live.line.match(/M /g) || []).length, 2);
+      assert.ok(live.area.includes("L 1000 64"));
+    }
+    assert.ok(
+      !trafficPaths(samples, 60000, 4096, direction).line.includes("H 1000"),
+      "missing or stale data does not extend to now",
+    );
+  }
+  assert.equal(samples[1].time, 57500);
+});

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { trafficHistory, type Profile } from "@/entities/tunnel";
 import { bytes } from "@/shared/lib/format";
 import { t } from "@/shared/lib/i18n";
@@ -6,29 +6,96 @@ import { trafficPaths } from "../model/paths";
 
 export function ConnectionSparkline({ profile }: { profile: Profile }) {
   const [clock, setClock] = useState(Date.now);
+  const lineRx = useRef<SVGPathElement>(null);
+  const lineTx = useRef<SVGPathElement>(null);
+  const areaRx = useRef<SVGPathElement>(null);
   const id = useId().replaceAll(":", "");
-  // Age history and detect stale readings without a permanent animation-frame loop.
+  const visible =
+    (profile.active || profile.statusUnknown) && !profile.appRouting;
+
   useEffect(() => {
-    if (!profile.active) return;
+    if (!visible) return;
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
     let timer: ReturnType<typeof setInterval> | undefined;
-    const visibility = () => {
+    let lastTime: number | undefined;
+    let appearedAt = 0;
+    let displayScale = 0;
+    let lastFrame = performance.now();
+    const draw = () => {
+      const now = Date.now();
+      const { samples, scale, current } = trafficHistory.read(profile.id, now);
+      const timestamp = performance.now();
+      const latestTime = samples.at(-1)?.time;
+      if (latestTime !== lastTime) {
+        // Existing history is rendered immediately; only new measurements grow in.
+        appearedAt = lastTime === undefined ? timestamp - 400 : timestamp;
+        lastTime = latestTime;
+      }
+      const elapsed = Math.max(0, timestamp - lastFrame);
+      displayScale =
+        !displayScale || reducedMotion.matches
+          ? scale
+          : displayScale +
+            (scale - displayScale) * (1 - Math.exp(-elapsed / 240));
+      lastFrame = timestamp;
+      const progress = reducedMotion.matches
+        ? 1
+        : Math.min(1, (timestamp - appearedAt) / 400);
+      const rx = trafficPaths(
+        samples,
+        now,
+        displayScale,
+        "rx",
+        progress,
+        !!current,
+      );
+      const tx = trafficPaths(
+        samples,
+        now,
+        displayScale,
+        "tx",
+        progress,
+        !!current,
+      );
+      lineRx.current?.setAttribute("d", rx.line);
+      lineTx.current?.setAttribute("d", tx.line);
+      areaRx.current?.setAttribute("d", rx.area);
+    };
+    const tick = () => {
+      if (document.hidden || reducedMotion.matches) return;
+      draw();
+      frame = requestAnimationFrame(tick);
+    };
+    const restart = () => {
+      cancelAnimationFrame(frame);
       clearInterval(timer);
       if (document.hidden) return;
+      lastFrame = performance.now();
+      draw();
       setClock(Date.now());
-      timer = setInterval(() => setClock(Date.now()), 2500);
+      if (!reducedMotion.matches) frame = requestAnimationFrame(tick);
+      timer = setInterval(() => {
+        setClock(Date.now());
+        if (reducedMotion.matches) draw();
+      }, 2500);
     };
-    visibility();
-    document.addEventListener("visibilitychange", visibility);
+    restart();
+    document.addEventListener("visibilitychange", restart);
+    reducedMotion.addEventListener("change", restart);
     return () => {
+      cancelAnimationFrame(frame);
       clearInterval(timer);
-      document.removeEventListener("visibilitychange", visibility);
+      document.removeEventListener("visibilitychange", restart);
+      reducedMotion.removeEventListener("change", restart);
     };
-  }, [profile.active]);
-  const now = Math.max(clock, Date.now());
-  const { samples, current, scale } = trafficHistory.read(profile.id, now);
-  const rx = trafficPaths(samples, now, scale, "rx");
-  const tx = trafficPaths(samples, now, scale, "tx");
-  if (!profile.active && !profile.statusUnknown) return null;
+  }, [profile.id, visible]);
+
+  const { current } = trafficHistory.read(
+    profile.id,
+    Math.max(clock, Date.now()),
+  );
+  if (!visible) return null;
   const rate = (value: number) => `${bytes(value)}/${t("с")}`;
   return (
     <div
@@ -36,56 +103,31 @@ export function ConnectionSparkline({ profile }: { profile: Profile }) {
       role="group"
       aria-label={t("Трафик VPN за последнюю минуту")}
     >
-      <div className="traffic-chart-heading">
-        <span>{t("ТРАФИК · 60 С")}</span>
+      <svg viewBox="0 0 1000 64" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={`${id}-rx`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="currentColor" stopOpacity="0.22" />
+            <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          ref={areaRx}
+          className="traffic-rx traffic-area"
+          fill={`url(#${id}-rx)`}
+        />
+        <path ref={lineRx} className="traffic-rx traffic-line" />
+        <path ref={lineTx} className="traffic-tx traffic-line" />
+      </svg>
+      {current && (
         <div className="traffic-chart-rates">
           <span className="traffic-rx" aria-label={t("Получено в секунду")}>
-            ↓ {current ? rate(current.rx) : "—"}
+            ↓ {rate(current.rx)}
           </span>
           <span className="traffic-tx" aria-label={t("Отправлено в секунду")}>
-            ↑ {current ? rate(current.tx) : "—"}
+            ↑ {rate(current.tx)}
           </span>
         </div>
-      </div>
-      <div className="traffic-chart-plot">
-        <svg
-          viewBox="0 0 1000 72"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id={`${id}-rx`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="currentColor" stopOpacity="0.22" />
-              <stop offset="1" stopColor="currentColor" stopOpacity="0.015" />
-            </linearGradient>
-          </defs>
-          <path
-            className="traffic-grid"
-            d="M 0 8 H 1000 M 0 36 H 1000 M 0 64 H 1000"
-          />
-          <path
-            className="traffic-rx traffic-area"
-            fill={`url(#${id}-rx)`}
-            d={rx.area}
-          />
-          <path className="traffic-rx traffic-line" d={rx.line} />
-          <path className="traffic-tx traffic-line" d={tx.line} />
-        </svg>
-        <span className="traffic-chart-scale">{rate(scale)}</span>
-        {!current && (
-          <span className="traffic-chart-message">
-            {t(
-              profile.appRouting
-                ? "Статистика трафика недоступна."
-                : "Ожидаем данные о трафике…",
-            )}
-          </span>
-        )}
-      </div>
-      <div className="traffic-chart-axis">
-        <span>{t("−60 с")}</span>
-        <span>{t("Сейчас")}</span>
-      </div>
+      )}
     </div>
   );
 }
