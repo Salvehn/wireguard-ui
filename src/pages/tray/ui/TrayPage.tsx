@@ -60,13 +60,21 @@ export function TrayPage() {
                 <div>
                   <strong>{p.name}</strong>
                   <small>
-                    <i className={p.active ? "online" : ""} />
+                    <i
+                      className={
+                        p.active && p.connectionHealth !== "stale"
+                          ? "online"
+                          : ""
+                      }
+                    />
                     {busy
                       ? t("Выполняется операция…")
                       : p.statusUnknown
                         ? t("Нужно проверить")
                         : p.active
-                          ? t("Интерфейс активен")
+                          ? p.connectionHealth === "stale"
+                            ? t("Нет ответа от сервера")
+                            : t("Интерфейс активен")
                           : t("Отключён")}
                   </small>
                 </div>

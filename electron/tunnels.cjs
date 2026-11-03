@@ -21,10 +21,31 @@ function routeNotes(profile, others, platform = process.platform) {
 class TunnelController {
   constructor({list, execute, log, platform = process.platform}) {
     this.list = list; this.execute = execute; this.log = log; this.platform = platform;
-    this.pending = new Map(); this.tail = Promise.resolve();
+    this.revisions = new Map(); this.pending = new Map(); this.tail = Promise.resolve();
+  }
+  revision(id) { return this.revisions.get(id) || 0; }
+  // Keep DOWN/UP in one queue job, with cancellation checks at both boundaries.
+  reconnect(id, {revision, cancelled, shouldReconnect}) {
+    if (this.pending.has(id) || this.revision(id) !== revision || cancelled()) return Promise.resolve();
+    this.pending.set(id, 'queued-reconnect');
+    const job = this.tail.then(async () => {
+      if (cancelled() || this.revision(id) !== revision) return;
+      const profile = (await this.list()).find(p => p.id === id);
+      if (!profile || cancelled() || this.revision(id) !== revision || !shouldReconnect(profile)) return;
+      this.pending.set(id, 'reconnecting');
+      this.log(`${profile.name}: восстановление соединения после сна`);
+      await this.execute(profile, 'down');
+      if (cancelled() || this.revision(id) !== revision) return;
+      await this.execute(profile, 'up');
+      this.log(`${profile.name}: туннель перезапущен после сна`);
+    }).catch(error => { this.log(error.stderr || error.message); })
+      .finally(() => this.pending.delete(id));
+    this.tail = job;
+    return job;
   }
   setActive(id, active) {
     if (typeof id !== 'string' || typeof active !== 'boolean') return Promise.reject(Error('Некорректная операция'));
+    this.revisions.set(id, this.revision(id) + 1);
     if (this.pending.has(id)) return Promise.reject(Error('Для этого туннеля уже выполняется операция'));
     this.pending.set(id, active ? 'queued-up' : 'queued-down');
     const job = this.tail.then(async () => {

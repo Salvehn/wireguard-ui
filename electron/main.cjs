@@ -4,6 +4,7 @@ const {parseConfig,redact}=require('./config.cjs');
 const {defaults:smartDefaults,validateSettingsForSave,applySmartTunneling,hasWildcard}=require('./smart-tunneling.cjs');
 const {validateApps,compileApps,enabled:appsEnabled}=require('./app-tunneling.cjs');
 const {routeNotes,TunnelController}=require('./tunnels.cjs');
+const {createWakeRecovery,connectionHealth}=require('./wake-recovery.cjs');
 
 const {maskConfig,restoreConfig,revision}=require('./editor.cjs');
 const {RuntimeStatus}=require('./runtime-status.cjs');
@@ -20,6 +21,7 @@ let theme;
 let refreshLocaleUI=()=>{};
 let importing=false;
 let runtime;let helper={status:'required',message:''};let helperSnapshot={profiles:{},updatedAt:0};let helperSetup=null;
+let wakeRecovery;
 let win,popover,tray,trayTimer,quitting=false,closing=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
 const log=message=>{logs=[...logs,{time:Date.now(),message:redact(message)}].slice(-100)};
 async function backend(){return helper.status==='ready'?'WireGuard Desktop Helper':null}
@@ -36,7 +38,7 @@ async function setupHelper(){
  }catch(error){helper={status:'required',message:'Для управления VPN требуется системное разрешение. Попробуйте разрешить доступ ещё раз.'};log(error.message)}finally{helperSetup=null}})();return helperSetup;
 }
 async function profiles(){ const files=await fs.readdir(dir);await updateSnapshot(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(f=>f.slice(0,-5))); return Promise.all(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(async file=>{const id=file.slice(0,-5);const meta=JSON.parse(await fs.readFile(path.join(dir,id+'.json'),'utf8'));const runtimeState=helperSnapshot.profiles[id]||await runtime.read(id);return {id,...meta,...parseConfig(await fs.readFile(path.join(dir,file),'utf8')),...runtimeState,stats:runtimeState.active?runtimeState.stats||null:null}}))}
-async function state(){const all=await profiles();return {platform:process.platform,profiles:all.map(p=>({...p,notes:routeNotes(p,all,process.platform)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
+async function state(){const all=await profiles();return {platform:process.platform,profiles:all.map(p=>({...p,connectionHealth:connectionHealth(p),notes:routeNotes(p,all,process.platform)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
 app.whenReady().then(async()=>{
  nativeTheme.themeSource='system';
  theme=createTheme(path.join(app.getPath('userData'),'theme.json'),()=>nativeTheme.shouldUseDarkColors);await theme.load();
@@ -57,8 +59,8 @@ app.whenReady().then(async()=>{
  const mainOnly=event=>{if(event.sender!==win?.webContents)throw Error('Main window required')};
  const updateRolledBack=process.argv.includes('--update-rollback');
  const updater=createAppUpdater({app,fetch:(url,options)=>net.fetch(url,options),publicKey:fsSync.readFileSync(path.join(__dirname,'update-public-key.pem')),startupError:updateRolledBack?'Не удалось запустить новую версию. Предыдущая версия восстановлена.':'',publish:updateState=>{for(const window of BrowserWindow.getAllWindows())window.webContents.send('update-state-changed',updateState)},installUpdate:async update=>{
-   await launchUpdateWorker({app,...update});quitting=true;if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;
-   await shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message));app.quit();
+   await launchUpdateWorker({app,...update});quitting=true;wakeRecovery?.stop();if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;
+   await shutdownTunnels({profiles:async()=>{await controller.tail;return profiles()},downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message));app.quit();
  }});
  ipcMain.handle('get-update-state',e=>{authorized(e);return updater.getState()});
  ipcMain.handle('check-for-updates',e=>{mainOnly(e);return updater.check()});
@@ -156,8 +158,10 @@ app.whenReady().then(async()=>{
  tray.on('click',togglePopover);tray.on('right-click',()=>tray.popUpContextMenu(Menu.buildFromTemplate([{label:t('Открыть WireGuard Desktop'),click:()=>{win.show();win.focus()}},{label:t('Завершить приложение (отключить туннели)'),click:()=>app.quit()}])));
  const updateTray=async()=>{publishLocale();try{const all=await profiles();const count=all.filter(p=>p.active).length;if(process.platform==='darwin')tray.setTitle(controller.pending.size?'↻':all.some(p=>p.statusUnknown)?'?':count?String(count):'');tray.setToolTip('WireGuard Desktop · '+t('Активно:')+' '+count+' / '+all.length)}catch{tray.setToolTip('WireGuard Desktop · '+t('Ошибка чтения состояния'))}};
  void helperClient.available().then(available=>{if(helperSetup)return;helper={status:available?'ready':'required',message:''};return updateTray()});trayTimer=setInterval(updateTray,2500);
- powerMonitor.on('resume',()=>{snapshotPoller.invalidate();void updateTray()});
+ wakeRecovery=createWakeRecovery({controller,log,snapshot:()=>Object.entries(helperSnapshot.profiles).map(([id,p])=>({id,...p})),refresh:async()=>{snapshotPoller.invalidate();await profiles()}});
+ powerMonitor.on('suspend',()=>wakeRecovery.stop());
+ powerMonitor.on('resume',()=>{if(quitting)return;wakeRecovery.resume();snapshotPoller.invalidate();void updateTray()});
  // Quit must bring down active tunnels first: the helper daemon outlives the app.
- app.on('before-quit',event=>{quitting=true;if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles,downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});
+ app.on('before-quit',event=>{quitting=true;wakeRecovery?.stop();if(trayTimer)clearInterval(trayTimer);if(closing)return;closing=true;event.preventDefault();void shutdownTunnels({profiles:async()=>{await controller.tail;return profiles()},downTunnel:profile=>controller.setActive(profile.id,false),log}).catch(error=>log(error.message)).finally(()=>app.quit())});
  const updateMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate([{label:app.name,submenu:[{role:'about',label:t('О программе')},{label:t('Быстрые подключения'),accelerator:'CommandOrControl+Shift+T',click:togglePopover},{role:'quit',label:t('Завершить')}]},{label:t('Правка'),submenu:[{role:'undo',label:t('Отмена')},{role:'redo',label:t('Повторить')},{type:'separator'},{role:'cut',label:t('Вырезать')},{role:'copy',label:t('Копировать')},{role:'paste',label:t('Вставить')},{role:'selectAll',label:t('Выбрать всё')}]}]));refreshLocaleUI=updateMenu;updateMenu();app.on('activate',()=>{publishLocale();win.show();win.focus()});
 });

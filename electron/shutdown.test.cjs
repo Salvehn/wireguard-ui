@@ -45,3 +45,9 @@ test('unreadable tunnel list logs and quits without throwing', async () => {
   assert.deepEqual(result, { stopped: 0, total: 0 });
   assert.deepEqual(logs, ['Ошибка чтения состояния']);
 });
+test('waiting for an in-flight recovery is also bounded by the shutdown deadline', async () => {
+  const logs = [];
+  const result = await shutdownTunnels({ profiles: () => new Promise(() => {}), downTunnel: async () => assert.fail('must not run'), log: message => logs.push(message), timeout: 60 });
+  assert.deepEqual(result, { stopped: 0, total: 0 });
+  assert.equal(logs.length, 1);
+});

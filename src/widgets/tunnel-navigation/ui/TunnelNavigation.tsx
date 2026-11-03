@@ -49,11 +49,17 @@ export function TunnelNavigation({
                     : p.statusUnknown
                       ? t("Нужно проверить")
                       : p.active
-                        ? t("Интерфейс активен")
+                        ? p.connectionHealth === "stale"
+                          ? t("Нет ответа от сервера")
+                          : t("Интерфейс активен")
                         : t("Отключён")}
                 </small>
               </span>
-              <i className={p.active ? "online" : ""} />
+              <i
+                className={
+                  p.active && p.connectionHealth !== "stale" ? "online" : ""
+                }
+              />
             </button>
           </ViewTransition>
         ))}

@@ -264,5 +264,7 @@
   "Статистика трафика недоступна.": "Traffic statistics are unavailable.",
   "Ожидаем данные о трафике…": "Waiting for traffic data…",
   "−60 с": "−60 s",
-  "Сейчас": "Now"
+  "Сейчас": "Now",
+  "Нет ответа от сервера": "No response from server",
+  "Сервер давно не подтверждал соединение. Проверьте сеть или переподключите туннель.": "The server has not confirmed the connection recently. Check your network or reconnect the tunnel."
 }
