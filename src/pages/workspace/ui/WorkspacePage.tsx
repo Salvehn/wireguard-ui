@@ -188,7 +188,9 @@ export function WorkspacePage() {
               <section
                 className={
                   "connection " +
-                  (profile.active && profile.connectionHealth !== "stale"
+                  (profile.active &&
+                  profile.connectionHealth !== "stale" &&
+                  profile.connectionHealth !== "waiting"
                     ? "connected"
                     : "")
                 }
@@ -206,9 +208,11 @@ export function WorkspacePage() {
                       : profile.statusUnknown
                         ? t("Нужно проверить состояние")
                         : profile.active
-                          ? profile.connectionHealth === "stale"
-                            ? t("Нет ответа от сервера")
-                            : t("Интерфейс активен")
+                          ? profile.connectionHealth === "waiting"
+                            ? t("Сервер ещё не ответил")
+                            : profile.connectionHealth === "stale"
+                              ? t("Нет ответа от сервера")
+                              : t("Интерфейс активен")
                           : t("Готов к подключению")}
                   </h2>
                   <p>
@@ -222,13 +226,17 @@ export function WorkspacePage() {
                             "Состояние VPN пока неизвестно. Обновите его перед управлением соединением.",
                           )
                         : profile.active
-                          ? profile.connectionHealth === "stale"
+                          ? profile.connectionHealth === "waiting"
                             ? t(
-                                "Сервер давно не подтверждал соединение. Проверьте сеть или переподключите туннель.",
+                                "Интерфейс включён, но защищённое соединение ещё не установлено.",
                               )
-                            : t(
-                                "Туннель поднят. Доступность сервера не проверена.",
-                              )
+                            : profile.connectionHealth === "stale"
+                              ? t(
+                                  "Сервер давно не подтверждал соединение. Проверьте сеть или переподключите туннель.",
+                                )
+                              : t(
+                                  "Туннель поднят. Доступность сервера не проверена.",
+                                )
                           : t("Подключитесь, когда нужен защищённый маршрут.")}
                   </p>
                 </div>

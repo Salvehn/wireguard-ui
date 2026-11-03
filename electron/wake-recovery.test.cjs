@@ -190,3 +190,16 @@ test("shutdown waits for a recovery already bringing the tunnel UP, then disconn
   await shutdown;
   assert.deepEqual(f.calls, ["down", "up", "down"]);
 });
+
+test("a tunnel without its first handshake is waiting even before any traffic", () => {
+  const p = baseline();
+  p.stats.peers[0].lastHandshake = 0;
+  p.stats.peers[0].rx = 0;
+  assert.equal(connectionHealth(p), "waiting");
+  p.stats.peers[0].tx = 0;
+  assert.equal(connectionHealth(p), "waiting");
+  p.stats.peers[0].lastHandshake = Date.now() / 1000;
+  assert.equal(connectionHealth(p), "unknown");
+  p.active = false;
+  assert.equal(connectionHealth(p), "unknown");
+});

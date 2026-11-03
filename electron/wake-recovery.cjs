@@ -3,6 +3,7 @@ function connectionHealth(profile, now = Date.now()) {
   if (!profile.active || profile.statusUnknown || profile.appRouting)
     return "unknown";
   const peers = profile.stats?.peers || [];
+  if (peers.some((p) => !p.lastHandshake && p.rx === 0)) return "waiting";
   if (
     peers.some(
       (p) =>

@@ -71,7 +71,22 @@ async function start() {
   });
   await fs.chown(socketPath, uid, 0);
   await fs.chmod(socketPath, 0o600);
-  process.on("SIGTERM", () => server.close(() => process.exit(0)));
+  let checking = false;
+  const routeTimer = setInterval(() => {
+    if (checking) return;
+    checking = true;
+    void core
+      .maintain()
+      .catch((error) => process.stderr.write(redact(error.message) + "\n"))
+      .finally(() => {
+        checking = false;
+      });
+  }, 5000);
+  routeTimer.unref();
+  process.on("SIGTERM", () => {
+    clearInterval(routeTimer);
+    server.close(() => process.exit(0));
+  });
 })().catch((error) => {
   process.stderr.write(error.message + "\n");
   process.exit(1);

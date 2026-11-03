@@ -46,6 +46,8 @@
 
 ## Smart tunneling
 
+On macOS, connecting a tunnel with selective routes automatically sends its VPN server connection through Wi-Fi/Ethernet, even when another VPN is active. The client updates this route after network changes and removes it on disconnect. No manual route setup is needed; existing routes owned by other programs are not overwritten.
+
 Open **Smart tunneling** on a disconnected profile and choose what should use that connection. Rules belong to the profile and only narrow its original `AllowedIPs`.
 
 | Mode                         | Traffic through the connection                                         |

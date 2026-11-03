@@ -9,7 +9,7 @@ const { hasWildcard, validateSettings } = require("./smart-tunneling.cjs");
 const { AppTunnels } = require("./app-tunnels.cjs");
 const { validateApps, enabled: appsEnabled } = require("./app-tunneling.cjs");
 const exec = promisify(execFile);
-const VERSION = 12;
+const VERSION = 13;
 const validId = (id) => typeof id === "string" && /^wg[a-f0-9]{10}$/.test(id);
 function validateRequest(request) {
   if (!request || typeof request !== "object" || Array.isArray(request))
@@ -100,7 +100,9 @@ function createCore({
   runtimeDirectory = "/var/run/wireguard",
   userId = process.getuid(),
   smartOptions = {},
+  endpointOptions = {},
 }) {
+  const { EndpointRoutes } = require("./endpoint-routes.cjs");
   const bin = path.join(base, "bin");
   const env = {
     PATH: `/usr/bin:/bin:/usr/sbin:/sbin:${bin}`,
@@ -139,6 +141,7 @@ function createCore({
           "down",
           path.join(configDirectory, id + ".conf"),
         ]);
+      await endpoints.release(id);
     },
     withRoutesChange: (task) => applications.withNativeChange(task),
     ...smartOptions,
@@ -178,11 +181,19 @@ function createCore({
       };
     },
   });
+  const endpoints = new EndpointRoutes({
+    configDirectory,
+    run: systemRun,
+    states: async (ids) => (await snapshot(ids)).profiles,
+    ...endpointOptions,
+  });
   let initialization;
   const initialize = () =>
     (initialization ||= (async () => {
+      await endpoints.load();
       await applications.recover();
       await smart.recover();
+      await endpoints.refresh();
     })());
   async function snapshot(ids) {
     const { stdout } = await command("wg", ["show", "all", "dump"]);
@@ -213,7 +224,7 @@ function createCore({
         statusUnknown,
         interfaceName: active ? iface : null,
         stats: active ? interfaces[iface] : null,
-        smartError: smart.errors.get(id) || "",
+        smartError: endpoints.errors.get(id) || smart.errors.get(id) || "",
       };
     }
     for (const appState of await applications.snapshots())
@@ -235,6 +246,7 @@ function createCore({
         force: true,
       });
       await applications.remove(req.id);
+      await endpoints.release(req.id);
       applications.errors.delete(req.id);
       smart.errors.delete(req.id);
       return { removed: true };
@@ -292,19 +304,22 @@ function createCore({
       () => false,
     );
     if (!req.active && hasMarker) await smart.deactivate(req.id);
-    if (req.active || !exists) {
-      const tmp = target + "." + crypto.randomBytes(8).toString("hex");
-      try {
-        await fs.writeFile(tmp, session?.compiled || req.config, {
-          flag: "wx",
-          mode: 0o600,
-        });
-        await fs.rename(tmp, target);
-      } finally {
-        await fs.rm(tmp, { force: true });
-      }
-    }
     try {
+      const compiled = req.active
+        ? await endpoints.prepare(req.id, session?.compiled || req.config)
+        : req.config;
+      if (req.active || !exists) {
+        const tmp = target + "." + crypto.randomBytes(8).toString("hex");
+        try {
+          await fs.writeFile(tmp, compiled, {
+            flag: "wx",
+            mode: 0o600,
+          });
+          await fs.rename(tmp, target);
+        } finally {
+          await fs.rm(tmp, { force: true });
+        }
+      }
       const { stdout, stderr } = await command("bash", [
         path.join(bin, "wg-quick"),
         req.active ? "up" : "down",
@@ -312,6 +327,11 @@ function createCore({
       ]);
       applications.errors.delete(req.id);
       const after = await snapshot([req.id]);
+      if (req.active) {
+        if (!after.profiles[req.id].active)
+          throw Error("Не удалось определить интерфейс VPN");
+        await endpoints.activate(req.id, after.profiles[req.id].interfaceName);
+      } else await endpoints.release(req.id);
       if (session) {
         if (!after.profiles[req.id].active)
           throw Error("Не удалось определить интерфейс Smart tunneling");
@@ -323,8 +343,8 @@ function createCore({
         output: redact([stdout, stderr].filter(Boolean).join("\n")),
       };
     } catch (error) {
-      if (session) {
-        await smart.deactivate(req.id);
+      if (req.active) {
+        if (session) await smart.deactivate(req.id);
         const current = (await snapshot([req.id])).profiles[req.id];
         if (current.active)
           await command("bash", [path.join(bin, "wg-quick"), "down", target]);
@@ -332,13 +352,19 @@ function createCore({
           throw Error(
             "Не удалось безопасно остановить туннель после ошибки DNS",
           );
-        await smart.finish(req.id);
+        if (session) await smart.finish(req.id);
+        await endpoints.release(req.id);
       }
       throw Error(redact(error.stderr || error.message));
     }
   }
   return {
     initialize,
+    maintain: () =>
+      serialize(async () => {
+        await initialize();
+        await endpoints.refresh();
+      }),
     handle: (input) =>
       serialize(async () => {
         await initialize();

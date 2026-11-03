@@ -462,7 +462,20 @@ class SmartDns {
       matches: session.matches,
       observe: (name, addresses) =>
         this.serialize(() => this.observe(session, name, addresses)),
-      onError: (error) => this.errors.set(session.id, error.message),
+      onError: (error) => {
+        session.proxyError = error.message;
+        this.errors.set(session.id, error.message);
+      },
+      onSuccess: () => {
+        if (
+          session.ready &&
+          this.sessions.get(session.id) === session &&
+          this.errors.get(session.id) === session.proxyError
+        ) {
+          this.errors.delete(session.id);
+          session.proxyError = undefined;
+        }
+      },
     });
     const contentFor = (domain) =>
       `# WireGuard Desktop managed resolver\ndomain ${domain}\nnameserver 127.0.0.1\nport ${session.proxy.port}\nsearch_order 100\ntimeout 3\n`;

@@ -16,7 +16,7 @@ for(const [name,source] of Object.entries(sources)){
  }
  await fs.copyFile(actual,path.join(base,'bin',name));await fs.chmod(path.join(base,'bin',name),0o755);
 }
-for(const name of ['server.cjs','core.cjs','smart-dns.cjs','dns-wire.cjs','app-tunnels.cjs'])await fs.copyFile('helper/'+name,path.join(base,name));
+for(const name of ['server.cjs','endpoint-routes.cjs','core.cjs','smart-dns.cjs','dns-wire.cjs','app-tunnels.cjs'])await fs.copyFile('helper/'+name,path.join(base,name));
 await fs.copyFile('electron/app-tunneling.cjs',path.join(base,'app-tunneling.cjs'));
 await fs.copyFile('electron/config.cjs',path.join(base,'config.cjs'));
 // electron-builder excludes nested node_modules from extraResources. Keep this

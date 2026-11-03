@@ -56,6 +56,7 @@ async function fixture(t, { failActivation = false } = {}) {
     proxy,
     closed = false,
     configAtDown = "";
+  let endpointPinned = false;
   const routes = new Map(),
     calls = [];
   t.after(async () => {
@@ -114,6 +115,24 @@ async function fixture(t, { failActivation = false } = {}) {
     runtimeDirectory: runtime,
     userId: 501,
     run,
+    endpointOptions: {
+      run: async (file, args) => {
+        if (file.endsWith("networksetup"))
+          return { stdout: "(Hardware Port: Wi-Fi, Device: en0)" };
+        const address = "198.51.100.1";
+        if (args.includes("get"))
+          return {
+            stdout: args.includes("-ifscope")
+              ? "destination: default\ngateway: 192.0.2.1\ninterface: en0\nflags: <UP,GATEWAY>"
+              : endpointPinned
+                ? `destination: ${address}\ngateway: 192.0.2.1\ninterface: en0\nflags: <UP,GATEWAY,HOST,STATIC>`
+                : "destination: default\ngateway: 169.254.10.1\ninterface: utun99\nflags: <UP,GATEWAY>",
+          };
+        if (args.includes("add")) endpointPinned = true;
+        if (args.includes("delete")) endpointPinned = false;
+        return { stdout: "" };
+      },
+    },
     smartOptions: {
       resolverDirectory: resolvers,
       enforceOwnership: false,
@@ -139,12 +158,13 @@ async function fixture(t, { failActivation = false } = {}) {
     getProxy: () => proxy,
     closed: () => closed,
     active: () => active,
+    pinned: () => endpointPinned,
     configAtDown: () => configAtDown,
   };
 }
 test("helper connects wildcard-only tunnel, applies a DNS rule and fully cleans up on DOWN", async (t) => {
   const f = await fixture(t);
-  assert.equal((await f.core.handle({ op: "ping" })).version, 12);
+  assert.equal((await f.core.handle({ op: "ping" })).version, 13);
   await f.core.handle({
     op: "setActive",
     id,
@@ -153,6 +173,7 @@ test("helper connects wildcard-only tunnel, applies a DNS rule and fully cleans 
     smartTunneling: { mode: "include", entries: ["*.example.com"] },
   });
   assert.equal(f.active(), true);
+  assert.equal(f.pinned(), true);
   assert.equal(f.routes.size, 0);
   assert.equal((await fs.readdir(f.resolvers)).length, 1);
   await f.getProxy().observe("api.example.com", ["203.0.113.7"]);
@@ -162,6 +183,7 @@ test("helper connects wildcard-only tunnel, applies a DNS rule and fully cleans 
   assert.ok(!JSON.stringify(snapshot).includes("SECRET"));
   await f.core.handle({ op: "setActive", id, active: false, config });
   assert.equal(f.active(), false);
+  assert.equal(f.pinned(), false);
   assert.equal(f.closed(), true);
   assert.equal(f.routes.size, 0);
   assert.deepEqual(await fs.readdir(f.resolvers), []);
@@ -183,8 +205,40 @@ test("DNS activation failure rolls back the new tunnel and its resolver journal"
     /DNS port unavailable/,
   );
   assert.equal(f.active(), false);
+  assert.equal(f.pinned(), false);
   assert.deepEqual(await fs.readdir(f.resolvers), []);
   assert.ok(
     !(await fs.readdir(f.configs)).some((file) => file.endsWith(".smart.json")),
+  );
+});
+test("successful DNS clears a transient warning but a stopped session cannot clear errors", async (t) => {
+  const f = await fixture(t);
+  await f.core.handle({
+    op: "setActive",
+    id,
+    active: true,
+    config,
+    smartTunneling: { mode: "include", entries: ["*.example.com"] },
+  });
+  const proxy = f.getProxy();
+  proxy.onError(Error("DNS servers unavailable"));
+  assert.equal(
+    (await f.core.handle({ op: "snapshot", ids: [id] })).profiles[id]
+      .smartError,
+    "DNS servers unavailable",
+  );
+  proxy.onSuccess();
+  assert.equal(
+    (await f.core.handle({ op: "snapshot", ids: [id] })).profiles[id]
+      .smartError,
+    "",
+  );
+  proxy.onError(Error("route failure"));
+  await f.core.handle({ op: "setActive", id, active: false, config });
+  proxy.onSuccess();
+  assert.equal(
+    (await f.core.handle({ op: "snapshot", ids: [id] })).profiles[id]
+      .smartError,
+    "route failure",
   );
 });

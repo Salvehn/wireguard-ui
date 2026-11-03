@@ -118,3 +118,25 @@ test("failed policy updates return SERVFAIL rather than an unprotected address",
   assert.equal(response.readUInt16BE(6), 0);
 });
 module.exports = { answer };
+test("DNS recovery is reported only after an upstream response and successful route installation", async (t) => {
+  const events = [];
+  let fail = true;
+  const proxy = await createDnsProxy({
+    servers: [],
+    matches: () => true,
+    forwardQuery: async (q) => {
+      if (fail) throw Error("offline");
+      return answer(q, ["203.0.113.7"]);
+    },
+    observe: async () => events.push("route"),
+    onError: (e) => events.push(e.message),
+    onSuccess: () => events.push("recovered"),
+  });
+  t.after(() => proxy.close());
+  await exchange(makeQuery("api.example.com", 1), "127.0.0.1", proxy.port);
+  fail = false;
+  await exchange(makeQuery("api.example.com", 65), "127.0.0.1", proxy.port);
+  assert.deepEqual(events, ["offline"]);
+  await exchange(makeQuery("api.example.com", 1), "127.0.0.1", proxy.port);
+  assert.deepEqual(events, ["offline", "route", "recovered"]);
+});

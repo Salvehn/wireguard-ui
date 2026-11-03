@@ -25,7 +25,7 @@ export type Profile = {
   allowedIPs: string;
   peers: number;
   smartError?: string;
-  connectionHealth?: "unknown" | "stale";
+  connectionHealth?: "unknown" | "stale" | "waiting";
   appRouting?: boolean;
   smartTunneling?: SmartTunnelingSettings;
   active: boolean;

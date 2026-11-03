@@ -210,6 +210,7 @@ async function createDnsProxy(
     observe,
     matches,
     onError = () => {},
+    onSuccess = () => {},
     forwardQuery = (query) => forward(query, servers),
     port = 0,
     listenHost = "127.0.0.1",
@@ -231,13 +232,19 @@ async function createDnsProxy(
     if (active >= 32 || closed) return errorResponse(packet);
     active++;
     try {
-      if (!matches(q.name)) return await forwardQuery(packet);
+      if (!matches(q.name)) {
+        const response = await forwardQuery(packet);
+        answers(response, packet);
+        if ([0, 3].includes(response[3] & 15)) onSuccess(q.name);
+        return response;
+      }
       // HTTPS/SVCB hints can bypass A/AAAA resolution. Advertise no local HTTPS/SVCB
       // data for matching rules, so clients resolve the original host normally.
       if (q.type === 64 || q.type === 65) return errorResponse(packet, 0);
       const response = await forwardQuery(packet);
       const addresses = answers(response, packet);
       if (addresses.length) await observe(q.name, addresses);
+      if ([0, 3].includes(response[3] & 15)) onSuccess(q.name);
       return response;
     } catch (error) {
       onError(error);
@@ -302,7 +309,16 @@ async function createDnsProxy(
     // A free UDP port may already be occupied by an unrelated TCP service.
     if (port === 0 && error.code === "EADDRINUSE" && attempt < 8)
       return createDnsProxy(
-        { servers, observe, matches, onError, forwardQuery, port, listenHost },
+        {
+          servers,
+          observe,
+          matches,
+          onError,
+          onSuccess,
+          forwardQuery,
+          port,
+          listenHost,
+        },
         attempt + 1,
       );
     throw error;

@@ -266,5 +266,7 @@
   "−60 с": "−60 s",
   "Сейчас": "Now",
   "Нет ответа от сервера": "No response from server",
-  "Сервер давно не подтверждал соединение. Проверьте сеть или переподключите туннель.": "The server has not confirmed the connection recently. Check your network or reconnect the tunnel."
+  "Сервер давно не подтверждал соединение. Проверьте сеть или переподключите туннель.": "The server has not confirmed the connection recently. Check your network or reconnect the tunnel.",
+  "Сервер ещё не ответил": "Waiting for server response",
+  "Интерфейс включён, но защищённое соединение ещё не установлено.": "The interface is active, but the secure connection has not been established yet."
 }
