@@ -800,13 +800,17 @@ aside > .sidebar-foot {
 }
 .connection {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 140px;
+  grid-template-columns: auto minmax(0, 1fr) max-content;
   row-gap: 0;
   padding-bottom: 0;
   overflow: hidden;
 }
 .connection .primary {
-  width: 140px;
+  width: max-content;
+  min-width: 140px;
+}
+.connection .primary svg {
+  flex-shrink: 0;
 }
 .connection h2 {
   min-height: 46px;

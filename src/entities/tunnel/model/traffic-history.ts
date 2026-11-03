@@ -1,4 +1,4 @@
-import type { Profile } from "./types";
+import type { TrafficProfile, TrafficFrame } from "./types";
 
 export const trafficWindow = 60_000;
 export const trafficGap = 10_000;
@@ -23,8 +23,16 @@ type History = {
 
 export function createTrafficHistory() {
   const histories = new Map<string, History>();
+  let lastFrame = 0;
   return {
-    record(profiles: Profile[]) {
+    recordFrames(frames: TrafficFrame[]) {
+      for (const frame of frames) {
+        if (frame.sequence <= lastFrame) continue;
+        this.record(frame.profiles);
+        lastFrame = frame.sequence;
+      }
+    },
+    record(profiles: TrafficProfile[]) {
       const ids = new Set(profiles.map((profile) => profile.id));
       for (const id of histories.keys()) if (!ids.has(id)) histories.delete(id);
       for (const profile of profiles) {

@@ -18,6 +18,7 @@ export function useTunnels(interval = 2500) {
   const sequence = useRef(0);
   // Background snapshots update live DOM without capturing the whole window.
   const commit = useCallback((state: State) => {
+    trafficHistory.recordFrames(state.trafficFrames || []);
     trafficHistory.record(state.profiles);
     setData(state);
     setReady(true);
@@ -36,8 +37,13 @@ export function useTunnels(interval = 2500) {
   useEffect(() => {
     void refresh();
     const timer = setInterval(refresh, interval);
+    const resume = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener("visibilitychange", resume);
     return () => {
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", resume);
       sequence.current++;
     };
   }, [interval, refresh]);

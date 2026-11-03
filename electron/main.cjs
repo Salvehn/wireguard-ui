@@ -10,6 +10,8 @@ const {maskConfig,restoreConfig,revision}=require('./editor.cjs');
 const {RuntimeStatus}=require('./runtime-status.cjs');
 const helperClient=require('./helper-client.cjs');
 const {createSnapshotPoller}=require('./helper-snapshot.cjs');
+const {createTrafficBuffer}=require('./traffic-buffer.cjs');
+const trafficBuffer=createTrafficBuffer();
 const {assertUniqueProfile}=require('./profile-identity.cjs');
 const {createLocale}=require('./locale.cjs');
 const {createTheme}=require('./theme.cjs');
@@ -25,7 +27,7 @@ let wakeRecovery;
 let win,popover,tray,trayTimer,quitting=false,closing=false,dir,controller,statsBusy=false; let logs=[];const editing=new Set();
 const log=message=>{logs=[...logs,{time:Date.now(),message:redact(message)}].slice(-100)};
 async function backend(){return helper.status==='ready'?'WireGuard Desktop Helper':null}
-const snapshotPoller=createSnapshotPoller({request:(command,timeout)=>helperClient.request(command,timeout),receive:snapshot=>{helperSnapshot=snapshot;helper={status:'ready',message:''}},failed:error=>{helperSnapshot={profiles:{},updatedAt:0};if(helper.status!=='error')log(error.message);helper={status:'error',message:'Не удалось получить состояние VPN. Восстанавливаем связь…'}}});
+const snapshotPoller=createSnapshotPoller({request:(command,timeout)=>helperClient.request(command,timeout),receive:snapshot=>{trafficBuffer.record(snapshot);helperSnapshot=snapshot;helper={status:'ready',message:''}},failed:error=>{trafficBuffer.unavailable();helperSnapshot={profiles:{},updatedAt:0};if(helper.status!=='error')log(error.message);helper={status:'error',message:'Не удалось получить состояние VPN. Восстанавливаем связь…'}}});
 async function updateSnapshot(ids,force=false){
  if(helper.status!=='ready'&&helper.status!=='error')return;
  return snapshotPoller.refresh(ids,force);
@@ -38,7 +40,7 @@ async function setupHelper(){
  }catch(error){helper={status:'required',message:'Для управления VPN требуется системное разрешение. Попробуйте разрешить доступ ещё раз.'};log(error.message)}finally{helperSetup=null}})();return helperSetup;
 }
 async function profiles(){ const files=await fs.readdir(dir);await updateSnapshot(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(f=>f.slice(0,-5))); return Promise.all(files.filter(f=>/^wg[a-f0-9]{10}\.conf$/.test(f)).map(async file=>{const id=file.slice(0,-5);const meta=JSON.parse(await fs.readFile(path.join(dir,id+'.json'),'utf8'));const runtimeState=helperSnapshot.profiles[id]||await runtime.read(id);return {id,...meta,...parseConfig(await fs.readFile(path.join(dir,file),'utf8')),...runtimeState,stats:runtimeState.active?runtimeState.stats||null:null}}))}
-async function state(){const all=await profiles();return {platform:process.platform,profiles:all.map(p=>({...p,connectionHealth:connectionHealth(p),notes:routeNotes(p,all,process.platform)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs}}
+async function state(){const all=await profiles();return {platform:process.platform,profiles:all.map(p=>({...p,connectionHealth:connectionHealth(p),notes:routeNotes(p,all,process.platform)})),backend:await backend(),operations:Object.fromEntries(controller.pending),statsBusy,helper,logs,trafficFrames:trafficBuffer.read()}}
 app.whenReady().then(async()=>{
  nativeTheme.themeSource='system';
  theme=createTheme(path.join(app.getPath('userData'),'theme.json'),()=>nativeTheme.shouldUseDarkColors);await theme.load();
@@ -52,7 +54,7 @@ app.whenReady().then(async()=>{
    const original=await fs.readFile(path.join(dir,profile.id+'.conf'),'utf8');
    const settings=profile.smartTunneling||smartDefaults();const appRules=validateApps(action==='up'?settings.applications:undefined,process.platform);const useApps=action==='up'&&appsEnabled(appRules);const dynamic=action==='up'&&hasWildcard(settings);
    const config=action==='up'&&!dynamic&&!useApps?await applySmartTunneling(original,settings):original;
-   try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config,...(useApps?{applications:appRules}:dynamic?{smartTunneling:settings}:{})});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;return result.output}
+   try{const result=await helperClient.request({op:'setActive',id:profile.id,active:action==='up',config,...(useApps?{applications:appRules}:dynamic?{smartTunneling:settings}:{})});helperSnapshot.profiles={...helperSnapshot.profiles,...result.profiles};helperSnapshot.updatedAt=0;trafficBuffer.record(helperSnapshot);return result.output}
    finally{helperSnapshot.updatedAt=0;snapshotPoller.invalidate()}
  }});
  const authorized=event=>{if(event.sender!==win?.webContents&&event.sender!==popover?.webContents)throw Error('Unknown sender')};

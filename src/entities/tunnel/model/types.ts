@@ -34,7 +34,22 @@ export type Profile = {
   interfaceName: string | null;
   stats: Stats | null;
 };
+export type TrafficProfile = Pick<
+  Profile,
+  "id" | "active" | "statusUnknown" | "interfaceName"
+> & {
+  stats: {
+    updatedAt: number;
+    peers: Pick<Peer, "publicKey" | "rx" | "tx">[];
+  } | null;
+};
+export type TrafficFrame = {
+  sequence: number;
+  time: number;
+  profiles: TrafficProfile[];
+};
 export type State = {
+  trafficFrames?: TrafficFrame[];
   platform: "darwin" | "win32";
   profiles: Profile[];
   backend: string | null;

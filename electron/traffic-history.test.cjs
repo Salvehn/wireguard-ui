@@ -194,3 +194,110 @@ test("both live lines meet the right edge without joining older gaps or changing
   }
   assert.equal(samples[1].time, 57500);
 });
+
+const { createTrafficBuffer } = require("./traffic-buffer.cjs");
+const snapshot = (profiles) => ({
+  profiles: Object.fromEntries(profiles.map((p) => [p.id, p])),
+});
+test("a renderer returning after 30 seconds replays measured traffic without a graph gap", () => {
+  let now = 1000;
+  const buffer = createTrafficBuffer({ now: () => now });
+  const history = model.createTrafficHistory();
+  for (; now <= 33500; now += 2500) {
+    buffer.record(snapshot([profile("a", now, now * 100, now * 10)]));
+    // No renderer reads while its window is minimized.
+    if (now <= 3500) history.recordFrames(buffer.read());
+  }
+  history.recordFrames(buffer.read());
+  const result = history.read("a", 33500);
+  assert.equal(result.samples.length, 13);
+  assert.equal(result.current.rx, 100000);
+  assert.equal(
+    (
+      trafficPaths(result.samples, 33500, result.scale, "rx").line.match(
+        /M /g,
+      ) || []
+    ).length,
+    1,
+  );
+  history.recordFrames(buffer.read());
+  assert.deepEqual(
+    history.read("a", 33500),
+    result,
+    "repeated IPC history does not duplicate or reset samples",
+  );
+});
+test("background outages and disconnects remain real gaps after a renderer resumes", () => {
+  for (const interruption of ["unavailable", "disconnect"]) {
+    let now = 1000;
+    const buffer = createTrafficBuffer({ now: () => now });
+    const history = model.createTrafficHistory();
+    buffer.record(snapshot([profile("a", now, 0, 0)]));
+    now = 3500;
+    buffer.record(snapshot([profile("a", now, 2500, 2500)]));
+    history.recordFrames(buffer.read());
+    now = 4000;
+    if (interruption === "unavailable") buffer.unavailable(["a"]);
+    else
+      buffer.record(
+        snapshot([profile("a", now, 0, 0, { active: false, stats: null })]),
+      );
+    now = 6000;
+    buffer.record(snapshot([profile("a", now, 5000, 5000)]));
+    now = 8500;
+    buffer.record(snapshot([profile("a", now, 7500, 7500)]));
+    history.recordFrames(buffer.read());
+    const result = history.read("a", now);
+    assert.equal(result.samples.length, 2);
+    assert.equal(
+      (
+        trafficPaths(result.samples, now, result.scale, "rx").line.match(
+          /M /g,
+        ) || []
+      ).length,
+      2,
+    );
+    history.recordFrames(buffer.read());
+    assert.deepEqual(history.read("a", now), result);
+  }
+});
+test("the main process buffer retains a baseline for a full minute after a long minimize", () => {
+  let now = 1000;
+  const buffer = createTrafficBuffer({ now: () => now });
+  for (; now <= 126000; now += 2500)
+    buffer.record(snapshot([profile("a", now, now * 10, now)]));
+  const history = model.createTrafficHistory();
+  history.recordFrames(buffer.read());
+  const samples = history.read("a", 126000).samples;
+  assert.equal(samples.length, 24);
+  assert.equal(samples[0].start, 66000);
+  assert.ok(buffer.read().length < 30);
+  now += 80000;
+  assert.deepEqual(buffer.read(), []);
+});
+test("sleep still establishes a new baseline instead of inventing measurements", () => {
+  let now = 1000;
+  const buffer = createTrafficBuffer({ now: () => now }),
+    history = model.createTrafficHistory();
+  buffer.record(snapshot([profile("a", now, 0, 0)]));
+  now = 3500;
+  buffer.record(snapshot([profile("a", now, 2500, 2500)]));
+  now = 30000;
+  buffer.record(snapshot([profile("a", now, 9000, 9000)]));
+  history.recordFrames(buffer.read());
+  assert.equal(history.read("a", now).current, null);
+});
+test("traffic IPC frames are bounded counter copies without configuration or endpoint data", () => {
+  const buffer = createTrafficBuffer({ now: () => 1000, limit: 3 });
+  const p = profile("a", 1000, 10, 20, {
+    privateKey: "SECRET",
+    endpoint: "private.example",
+  });
+  for (let i = 0; i < 6; i++) buffer.record(snapshot([p]));
+  p.stats.peers[0].rx = 999;
+  const frames = buffer.read();
+  assert.equal(frames.length, 3);
+  assert.equal(frames.at(-1).profiles[0].stats.peers[0].rx, 10);
+  assert.ok(!JSON.stringify(frames).includes("SECRET"));
+  assert.ok(!JSON.stringify(frames).includes("private.example"));
+});
