@@ -22,6 +22,37 @@ function parseRoute(text) {
     flags: (field("flags") || "").replace(/[<>]/g, "").split(","),
   };
 }
+function hostRouteFromTable(text, address) {
+  let columns;
+  for (const line of text.split(/\r?\n/)) {
+    const fields = line.trim().split(/\s+/);
+    if (fields[0] === "Destination") {
+      columns = fields;
+      continue;
+    }
+    if (!columns) continue;
+    const value = fields[columns.indexOf("Destination")];
+    if (!value) continue;
+    const [host, prefix] = value.split("/");
+    if (
+      ip(host) !== address ||
+      (prefix && Number(prefix) !== (net.isIP(address) === 6 ? 128 : 32))
+    )
+      continue;
+    const flags = fields[columns.indexOf("Flags")] || "";
+    if (!flags.includes("H") || flags.includes("I") || flags.includes("W"))
+      continue;
+    return {
+      address,
+      gateway: fields[columns.indexOf("Gateway")],
+      interfaceName: fields[columns.indexOf("Netif")],
+      flags: Object.entries({ U: "UP", G: "GATEWAY", H: "HOST", S: "STATIC" })
+        .filter(([flag]) => flags.includes(flag))
+        .map(([, name]) => name),
+    };
+  }
+  return null;
+}
 const exact = (route) =>
   route.flags.includes("HOST") &&
   !route.flags.includes("WASCLONED") &&
@@ -110,10 +141,21 @@ class EndpointRoutes {
   }
   async current(address) {
     try {
-      return parseRoute(
+      const lookup = parseRoute(
         (await this.run("/sbin/route", ["-n", "get", family(address), address]))
           .stdout,
       );
+      if (lookup.address === address && exact(lookup)) return lookup;
+      // macOS may return a scoped clone even when an unscoped static host
+      // route exists. Inspect the table for ownership, retaining the actual
+      // lookup path separately so verification still checks where packets go.
+      const table = await this.run("/usr/sbin/netstat", [
+        "-rn",
+        "-f",
+        net.isIP(address) === 6 ? "inet6" : "inet",
+      ]);
+      const host = hostRouteFromTable(table.stdout, address);
+      return host ? { ...host, lookup } : lookup;
     } catch (error) {
       if (
         /not in table|not found|no such process|network is unreachable/i.test(
@@ -192,9 +234,12 @@ class EndpointRoutes {
         this.routes.set(address, { address, ...desired, owned: false });
         await this.save();
       }
+      await this.verify(address, desired);
       return;
     }
     if (ours && same(current, desired)) {
+      if (!same(current.lookup || current, desired))
+        await this.verify(address, desired);
       if (record.previous || !same(record, desired)) {
         this.routes.set(address, { address, ...desired, owned: true });
         await this.save();
@@ -226,6 +271,11 @@ class EndpointRoutes {
       }
       throw error;
     }
+    await this.verify(address, next);
+    delete next.previous;
+    await this.save();
+  }
+  async verify(address, desired) {
     // A successful route write can precede the routing lookup cache update,
     // especially while another VPN is handling the same network change.
     // Only retry observation: never blindly re-add or replace a foreign route.
@@ -236,22 +286,23 @@ class EndpointRoutes {
       if (
         installed.address === address &&
         exact(installed) &&
-        same(installed, next)
+        same(installed, desired) &&
+        same(installed.lookup || installed, desired)
       )
         break;
     }
     if (
       installed.address !== address ||
       !exact(installed) ||
-      !same(installed, next)
+      !same(installed, desired) ||
+      !same(installed.lookup || installed, desired)
     ) {
-      const observed = `${installed.interfaceName || "?"}, ${installed.gateway || "?"}, ${installed.flags.join(",")}`;
+      const actual = installed.lookup || installed;
+      const observed = `${actual.interfaceName || "?"}, ${actual.gateway || "?"}, ${actual.flags.join(",")}`;
       throw Error(
         `Не удалось закрепить прямой маршрут к VPN-серверу (${address}; ${observed})`,
       );
     }
-    delete next.previous;
-    await this.save();
   }
   async prune() {
     const used = new Set(
@@ -396,4 +447,4 @@ class EndpointRoutes {
     await this.prune();
   }
 }
-module.exports = { EndpointRoutes, parseRoute };
+module.exports = { EndpointRoutes, parseRoute, hostRouteFromTable };

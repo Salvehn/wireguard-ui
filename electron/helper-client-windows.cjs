@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const run = promisify(execFile);
-const VERSION = 14;
+const VERSION = 15;
 
 let identityFile = "";
 let identityPromise;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BrandIcon } from "@/shared/ui/brand-icon";
 import { ArrowUpRight } from "lucide-react";
 import { tunnelApi, useTunnels, type Profile } from "@/entities/tunnel";
-import { useTunnelActions } from "@/features/manage-tunnels";
+import { useTunnelActions, toggleTunnel } from "@/features/manage-tunnels";
 export function TrayPage() {
   const [appearance, setAppearance] = useState(0);
   useEffect(() => {
@@ -17,15 +17,7 @@ export function TrayPage() {
   const { data, setData, ready, error, setError } = useTunnels(1500);
   const { pending, perform } = useTunnelActions(setData, setError);
   const toggle = (profile: Profile) =>
-    perform(async () => {
-      if (!data.backend) {
-        const state = await tunnelApi.setupHelper();
-        if (state.helper.status !== "ready") return state;
-      }
-      return profile.statusUnknown
-        ? tunnelApi.refreshStats()
-        : tunnelApi.setActive(profile.id, !profile.active);
-    }, profile.id);
+    perform(() => toggleTunnel(profile, data), profile.id);
   return (
     <div className="tray-panel" key={appearance}>
       <ViewTransition update="panel">

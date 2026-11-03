@@ -3,7 +3,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
-const { EndpointRoutes } = require("../helper/endpoint-routes.cjs");
+const {
+  EndpointRoutes,
+  hostRouteFromTable,
+} = require("../helper/endpoint-routes.cjs");
 const id = "wg1234567890",
   other = "wg0123456789",
   address = "198.51.100.10";
@@ -26,6 +29,14 @@ async function fixture(t) {
       return {
         stdout:
           "(Hardware Port: Wi-Fi, Device: en0)\n(Hardware Port: Ethernet, Device: en7)",
+      };
+    if (file.endsWith("netstat"))
+      return {
+        stdout:
+          "Destination Gateway Flags Netif Expire\n" +
+          [...table.values()]
+            .map((r) => `${r.address} ${r.gateway} UGHS ${r.interfaceName}`)
+            .join("\n"),
       };
     if (args.includes("get")) {
       if (args.includes("-ifscope")) {
@@ -307,4 +318,60 @@ test("persistent route replacement is reported after a bounded wait without over
   );
   assert.equal(f.table.get(address).interfaceName, "utun225");
   assert.equal(manager.sessions.size, 0);
+});
+test("macOS scoped clone of an installed static route is accepted on the first connection and cleaned up", async (t) => {
+  const f = await fixture(t);
+  const waits = [];
+  const run = async (file, args) => {
+    const result = await f.options.run(file, args);
+    if (
+      file === "/sbin/route" &&
+      args.includes("get") &&
+      !args.includes("-ifscope") &&
+      f.table.has(address)
+    )
+      return {
+        stdout: routeText({
+          address,
+          gateway: "192.168.50.1",
+          interfaceName: "en0",
+          flags: [
+            "UP",
+            "GATEWAY",
+            "HOST",
+            "DONE",
+            "WASCLONED",
+            "IFSCOPE",
+            "IFREF",
+            "GLOBAL",
+          ],
+        }),
+      };
+    return result;
+  };
+  const manager = new EndpointRoutes({
+    ...f.options,
+    run,
+    delay: async (ms) => waits.push(ms),
+  });
+  await manager.prepare(id, config());
+  await manager.activate(id, "utun8");
+  assert.deepEqual(waits, []);
+  assert.equal(manager.routes.get(address).owned, true);
+  assert.equal(f.calls.filter((c) => c.args.includes("add")).length, 1);
+  await manager.release(id);
+  assert.equal(f.table.size, 0);
+});
+test("route table ownership ignores scoped clones and wider subnet routes", () => {
+  const table =
+    "Destination Gateway Flags Netif Expire\n198.51.100/24 10.0.0.1 UGS en7\n198.51.100.10 10.0.0.2 UGHSI en7\n198.51.100.10 10.0.0.3 UGHW en7\n198.51.100.10 192.168.50.1 UGHS en0\n";
+  assert.equal(hostRouteFromTable(table, address).gateway, "192.168.50.1");
+  assert.equal(
+    hostRouteFromTable(
+      "Destination Gateway Flags Netif\n2001:db8::1/128 fe80::1%en0 UGHS en0",
+      "2001:db8::1",
+    ).interfaceName,
+    "en0",
+  );
+  assert.equal(hostRouteFromTable(table, "198.51.100.20"), null);
 });

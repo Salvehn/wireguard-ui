@@ -16,7 +16,7 @@ import {
 import { tunnelApi, useTunnels, type Profile } from "@/entities/tunnel";
 import { SmartTunneling } from "@/features/smart-tunneling";
 import { ConfigEditor } from "@/features/edit-tunnel";
-import { useTunnelActions } from "@/features/manage-tunnels";
+import { useTunnelActions, toggleTunnel } from "@/features/manage-tunnels";
 import { TunnelNavigation } from "@/widgets/tunnel-navigation";
 import { StatsPanel } from "@/widgets/tunnel-stats";
 import { EventLog } from "@/widgets/event-log";
@@ -245,15 +245,7 @@ export function WorkspacePage() {
                   disabled={!!operation || data.helper.status === "installing"}
                   aria-busy={!!operation || data.helper.status === "installing"}
                   onClick={() =>
-                    perform(async () => {
-                      if (!data.backend) {
-                        const state = await tunnelApi.setupHelper();
-                        if (state.helper.status !== "ready") return state;
-                      }
-                      return profile.statusUnknown
-                        ? tunnelApi.refreshStats()
-                        : tunnelApi.setActive(profile.id, !profile.active);
-                    }, profile.id)
+                    perform(() => toggleTunnel(profile, data), profile.id)
                   }
                 >
                   {operation || data.helper.status === "installing" ? (
