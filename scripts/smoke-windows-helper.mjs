@@ -76,7 +76,7 @@ const deactivate = async (id) => {
 };
 try {
   const ping = await waitForHelper();
-  if (ping.version !== 13) throw Error("unexpected helper version");
+  if (ping.version !== 14) throw Error("unexpected helper version");
 
   const native = await request({
     op: "setActive",

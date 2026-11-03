@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const net = require("node:net");
-const { createCore, validateRequest } = require("../helper/core.cjs");
+const { VERSION, createCore, validateRequest } = require("../helper/core.cjs");
 const { systemRoutes } = require("../helper/smart-dns.cjs");
 const id = "wg1234567890",
   key = "A".repeat(43) + "=";
@@ -164,7 +164,7 @@ async function fixture(t, { failActivation = false } = {}) {
 }
 test("helper connects wildcard-only tunnel, applies a DNS rule and fully cleans up on DOWN", async (t) => {
   const f = await fixture(t);
-  assert.equal((await f.core.handle({ op: "ping" })).version, 13);
+  assert.equal((await f.core.handle({ op: "ping" })).version, VERSION);
   await f.core.handle({
     op: "setActive",
     id,

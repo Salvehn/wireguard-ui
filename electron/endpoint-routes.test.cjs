@@ -237,3 +237,74 @@ test("invalid recovery data cannot supply arbitrary route arguments", async (t) 
   await assert.rejects(f.manager.load(), /Invalid endpoint/);
   assert.equal(f.calls.length, 0);
 });
+test("first connection waits for stale route lookups after a successful add without adding twice", async (t) => {
+  const f = await fixture(t);
+  const waits = [];
+  let stale = 2;
+  const run = async (file, args) => {
+    const result = await f.options.run(file, args);
+    if (
+      args.includes("get") &&
+      !args.includes("-ifscope") &&
+      f.table.has(address) &&
+      stale-- > 0
+    )
+      return {
+        stdout: routeText({
+          address,
+          gateway: "169.254.10.1",
+          interfaceName: "utun225",
+          flags: ["UP", "GATEWAY", "HOST", "WASCLONED", "IFSCOPE"],
+        }),
+      };
+    return result;
+  };
+  const manager = new EndpointRoutes({
+    ...f.options,
+    run,
+    delay: async (ms) => waits.push(ms),
+  });
+  await manager.prepare(id, config());
+  await manager.activate(id, "utun8");
+  assert.deepEqual(waits, [100, 200]);
+  assert.equal(f.calls.filter((c) => c.args.includes("add")).length, 1);
+  assert.equal(manager.sessions.get(id).interfaceName, "utun8");
+  await manager.release(id);
+  assert.equal(f.table.size, 0);
+});
+test("persistent route replacement is reported after a bounded wait without overwriting or deleting it", async (t) => {
+  const f = await fixture(t);
+  const waits = [];
+  const run = async (file, args) => {
+    const result = await f.options.run(file, args);
+    if (args.includes("add"))
+      f.table.set(address, {
+        address,
+        gateway: "169.254.10.1",
+        interfaceName: "utun225",
+      });
+    return result;
+  };
+  const manager = new EndpointRoutes({
+    ...f.options,
+    run,
+    delay: async (ms) => waits.push(ms),
+  });
+  await assert.rejects(
+    manager.prepare(id, config()),
+    /Не удалось закрепить.*utun225/,
+  );
+  assert.equal(
+    waits.reduce((a, b) => a + b, 0),
+    2000,
+  );
+  assert.equal(f.calls.filter((c) => c.args.includes("add")).length, 1);
+  assert.equal(
+    f.calls.filter(
+      (c) => c.args.includes("change") || c.args.includes("delete"),
+    ).length,
+    0,
+  );
+  assert.equal(f.table.get(address).interfaceName, "utun225");
+  assert.equal(manager.sessions.size, 0);
+});

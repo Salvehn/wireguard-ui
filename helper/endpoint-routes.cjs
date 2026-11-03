@@ -37,8 +37,9 @@ class EndpointRoutes {
     run,
     states,
     lookup = (host) => dns.lookup(host, { all: true }),
+    delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   }) {
-    Object.assign(this, { run, states, lookup });
+    Object.assign(this, { run, states, lookup, delay });
     this.file = path.join(configDirectory, "endpoint-routes.json");
     this.sessions = new Map();
     this.routes = new Map();
@@ -225,13 +226,30 @@ class EndpointRoutes {
       }
       throw error;
     }
-    const installed = await this.current(address);
+    // A successful route write can precede the routing lookup cache update,
+    // especially while another VPN is handling the same network change.
+    // Only retry observation: never blindly re-add or replace a foreign route.
+    let installed;
+    for (const wait of [0, 100, 200, 400, 600, 700]) {
+      if (wait) await this.delay(wait);
+      installed = await this.current(address);
+      if (
+        installed.address === address &&
+        exact(installed) &&
+        same(installed, next)
+      )
+        break;
+    }
     if (
       installed.address !== address ||
       !exact(installed) ||
       !same(installed, next)
-    )
-      throw Error("Не удалось закрепить прямой маршрут к VPN-серверу");
+    ) {
+      const observed = `${installed.interfaceName || "?"}, ${installed.gateway || "?"}, ${installed.flags.join(",")}`;
+      throw Error(
+        `Не удалось закрепить прямой маршрут к VPN-серверу (${address}; ${observed})`,
+      );
+    }
     delete next.previous;
     await this.save();
   }
